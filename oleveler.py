@@ -1989,7 +1989,9 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
 
 
 def plotVolcano(compDf, quantSeries, figsize=(6, 5),
-                square=True, lfcThresh=1, pThresh=0.05, title=''):
+                square=True, lfcThresh=1, pThresh=0.05,
+                xmax=None, ymax=None,
+                title=''):
     """
 # c = 'mu_wt20'
 # cols = metaDf[
@@ -2037,17 +2039,28 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     procPval = -np.log10(pval)
     logpThresh = -np.log10(pThresh)
 
+    # For output only
     vDf = pd.concat([log2fc, procPval], axis=1, names=[colFc, f"'-log10({colPv})"])
 
-    # Set positive and negative X range equal
-    ymax = procPval[np.isfinite(procPval)].max() * 1.1
-    yinf = procPval[~np.isfinite(procPval)].index
-    ymin = 0 - ymax/1.1*0.05
-    xmax = np.abs(log2fc[np.isfinite(log2fc)]).max() * 1.1
+    if not isinstance(xmax, type(None)):
+        xmax = xmax*1.1
+        log2fc.loc[log2fc> xmax] = np.inf
+        log2fc.loc[log2fc< -xmax] = -np.inf
+    else:
+        # Set positive and negative X range equal
+        xmax = np.abs(log2fc[np.isfinite(log2fc)]).max() * 1.1
     # Move inf points to the edge of the plot
     log2fc = log2fc.replace(np.inf, xmax)
     log2fc = log2fc.replace(-np.inf, -xmax)
+
+    if not isinstance(ymax, type(None)):
+        ymax = ymax *1.1
+        procPval.loc[procPval>ymax] = np.inf
+    else:
+        ymax = procPval[np.isfinite(procPval)].max() * 1.1
+    ymin = 0 - ymax/1.1*0.05
     procPval = procPval.replace(np.inf, ymax)
+
     assert all(log2fc.index == procPval.index)
 
     # Process quantification data
