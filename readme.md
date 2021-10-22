@@ -18,9 +18,10 @@ Please include `%matplotlib widget` to allow interactive plotting. However, with
 
 (INCOMPLETE)
 
-- Python3
-  - numpy pandas scipy rpy2 matplotlib scikit-learn BCBio
-  - openpyxl # for xlsx read and write
+- mamba/conda/micromamba -c conda-forge -c bioconda -c r
+  - numpy pandas scipy rpy2 matplotlib scikit-learn r openpyxl jupyterlab nodejs ipympl
+- pip install
+  - bcbio-gff
 - R
   - MSstats
   - DESeq2
@@ -28,6 +29,7 @@ Please include `%matplotlib widget` to allow interactive plotting. However, with
 
 ## TODO:
 
+- Close temp files opened due to required compatibility to windows
 - \*DESeq2 will die when too many comparisons will run in the same R kernel. This often happens because each comparison consume to much memory and thus leads to memory surge. The problem happens within DESeq2 code that I am not able to solve. Possible solutions include force release memory of saved results; force restart R kernel within R code (python cannot do this) after certain comparisons.
 - Pack related functions
 - Add references list
