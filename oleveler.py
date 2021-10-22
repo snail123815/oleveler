@@ -1,8 +1,20 @@
+############################################
+# by Chao DU
+# Institute of Biology Leiden
+# Leiden University
+# c.du@biology.leidenuniv.nl
+# durand[dot]dc[at]hot[no space]mail.com
+############################################
+# TODO make it compatable with windows
+# TODO hash in different file system do not work the same
+# NOT COMPATABLE WITH WINDOWS!!!!!!
+############################################
 import os
 import pickle
 import logging
 import sys
 from multiprocessing import Process
+from threading import Thread
 from tempfile import NamedTemporaryFile
 from hashlib import md5
 from datetime import datetime
@@ -486,7 +498,7 @@ def calculateTPM(countTableDf, infoFiles,
     Returns:
         pd.DataFrame: TPM calculated
     """
-    with NamedTemporaryFile() as f:
+    with NamedTemporaryFile(delete=False) as f:
         countTableDf.to_csv(f, sep='\t')
         for p in [infoFiles, tagsForGeneName, lengthColParsingKeys, typeCol, 
             str(removerRNA), removeIDsubstrings, removeIDcontains]:
@@ -568,7 +580,7 @@ def getStats(dataDf, experiments):
     If you want to exclude any data, do that before passing data in here.
     """
     # calculate hash for parameters
-    with NamedTemporaryFile() as f:
+    with NamedTemporaryFile(delete=False) as f:
         dataDf.to_csv(f.name, sep='\t')
         f.write(''.join(experiments.keys()).encode())
         f.write(''.join(''.join(experiments[k]) for k in experiments).encode())
@@ -625,7 +637,7 @@ def genInfoDfDESeq2(dataDf, metaDf):
     infoDf = metaDf.Condition.to_frame()
     infoDf.index = metaDf.Experiment
     infoDf = infoDf.reindex(index=dataDf.columns)
-    tempInfoFile = NamedTemporaryFile()
+    tempInfoFile = NamedTemporaryFile(delete=False)
     infoDf.to_csv(tempInfoFile.name, sep='\t')
     features = infoDf.columns
     return tempInfoFile, features
@@ -638,7 +650,7 @@ def writeDataForDESeq2(dataDf):
     tempCleanDataFile, outForR = writeDataForR(theDf)'''
     # fill with zeros and convert to int for DESeq2 input
     feedToRDf = dataDf.replace(np.nan, 0).round().astype('int')
-    tempCleanDataFile = NamedTemporaryFile()
+    tempCleanDataFile = NamedTemporaryFile(delete=False)
     feedToRDf.to_csv(tempCleanDataFile.name, sep='\t')
     return tempCleanDataFile
 
@@ -654,13 +666,13 @@ def deseq2Process(
     Will return vstDf by default (deOnly = False).
     If you want to do difference analysis, pass getDE=True
     """
-    pathTransformed = 'dataTables/transformed'
+    pathTransformed = os.path.join('dataTables','transformed')
     if not os.path.isdir(pathTransformed):
         os.makedirs(pathTransformed)
     # calculate hash
-    with NamedTemporaryFile() as f:
+    with NamedTemporaryFile(delete=False) as f:
         dataDf.to_csv(f.name)
-        with NamedTemporaryFile() as g:
+        with NamedTemporaryFile(delete=False) as g:
             metaDf.to_csv(g.name)
             mhb = md5(g.read()).digest()
         f.write(mhb)
@@ -673,6 +685,7 @@ def deseq2Process(
     # TODO remove columns based on metaDf
 
     pathVst = os.path.join(pathTransformed, f'vst_{ha}.tsv')
+    pathVst = pathVst.replace('\\', '\\\\')
 
     if os.path.isfile(pathVst) and not deOnly:
         logger.info(f'Read VST transformed data from {pathVst}.')
@@ -686,10 +699,12 @@ def deseq2Process(
     tempInfoFile, features = genInfoDfDESeq2(dataDf, metaDf)
     logger.info('Fitting data using DESeq2...')
     idxName = dataDf.index.name
+    tif = tempInfoFile.name.replace('\\', '\\\\')
+    tdf = tempDataFile.name.replace('\\', '\\\\')
     robjects.r(
         f"""
-        coldata = read.csv('{tempInfoFile.name}', sep='\t', row.names = 1, header = TRUE)
-        cts = as.matrix(read.csv('{tempDataFile.name}',sep='\t', row.names = '{idxName}'))
+        coldata = read.csv('{tif}', sep='\t', row.names = 1, header = TRUE)
+        cts = as.matrix(read.csv('{tdf}',sep='\t', row.names = '{idxName}'))
         print(all(rownames(coldata) == colnames(cts)))
         """
     )
@@ -776,6 +791,9 @@ def prepareMSstats(mqDataPath, annotationPath):
     pgPath = os.path.join(mqDataPath, "proteinGroups.txt")
     evPath = os.path.join(mqDataPath, 'evidence.txt')
     logger.info('Read MaxQuant data')
+    annotationPath = annotationPath.replace('\\','\\\\')
+    pgPath = pgPath.replace('\\','\\\\')
+    evPath = evPath.replace('\\','\\\\')
     robjects.r(
         f"""
         proteinGroups <- read.table(
@@ -817,7 +835,7 @@ def processMSstats(mqDataPath, annotationPath):
     # calculate Hash
     pgPath = os.path.join(mqDataPath, "proteinGroups.txt")
     evPath = os.path.join(mqDataPath, 'evidence.txt')
-    haFile = NamedTemporaryFile()
+    haFile = NamedTemporaryFile(delete=False)
     with open(pgPath, 'rb') as f:
         haFile.write(md5(f.read()).digest())
     with open(evPath, 'rb') as f:
@@ -838,6 +856,7 @@ def processMSstats(mqDataPath, annotationPath):
     else:
         prepareMSstats(mqDataPath, annotationPath)
         logger.info('Write proposed data to table')
+        proposedDataPath = proposedDataPath.replace('\\','\\\\')
         logger.info(proposedDataPath)
         robjects.r(
             f"""
@@ -952,6 +971,7 @@ def msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile):
 #     print(levels(maxquant.proposed$ProteinLevelData$GROUP))
 #     print(comparisons)
 #     """)
+    compResultFile = compResultFile.replace('\\','\\\\')
     robjects.r(
         f"""
         maxquant.comparisons <- groupComparison(
@@ -976,16 +996,20 @@ def msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile):
     return compResultFile
 
 
-def _deseq2Comp(a, b, name, extra, subResFile):
-    robjects.r(
-        f"""
+def _deseq2Comp(a, b, name, extra, subResFileName):
+    #print('start ', subResFileName)
+    #print(a, b, name, extra)
+    rstr = f"""
         #print(resultsNames(dds))
         res <- {a}(dds, {b}="{name}", parallel=TRUE{extra})
         
         write.table(as.data.frame(res), col.names=NA, sep='\t',
-                    file="{subResFile.name}")
+                    file="{subResFileName}")
+        #print("{subResFileName}")
         """
-    )
+    #print(rstr)
+    robjects.r(rstr)
+    #print('Done')
 
 
 def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrink=True, timeout=100):
@@ -1028,7 +1052,7 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
             previousDesign = design
             previousCtr = ctr
         name = f'{design}_{exp}_vs_{ctr}'
-        subResFile = NamedTemporaryFile()
+        subResFile = NamedTemporaryFile(delete=False)
         if lfcShrink:
             a = 'lfcShrink'
             b = 'coef'
@@ -1051,13 +1075,31 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
         maxRetryTime = 30*60  # 30 min
         i = 0
         t = timeout
+        #fn = subResFile.name
+        #print('temp file name ', fn)
+        subResFile.close()
+        #print('temp file name after close ', subResFile.name)
         while os.path.getsize(subResFile.name) == 0:
+            #print(os.path.getsize(subResFile.name))
             if i > 0:
                 logger.info(f'Failed to calculate comparison within {int(t/60)} min, retry.')
-            p = Process(target=_deseq2Comp, args=(a, b, name, extra, subResFile))
-            subResFile.seek(0)  # Not necessary, r should write the file in R process
-            p.start()
-            p.join(timeout=t)
+            srf = subResFile.name.replace('\\', '\\\\')
+
+            #p = Process(target=_deseq2Comp, args=(a, b, name, extra, srf))
+            ##subResFile.seek(0)  # Not necessary, r should write the file in R process
+            #print('timeout limit ', t)
+            #p.start()
+            #p.join(timeout=t)
+
+
+            th = Thread(target=_deseq2Comp, args=(a, b, name, extra, srf))
+            th.daemon = True
+            #subResFile.seek(0)  # Not necessary, r should write the file in R process
+            #print('timeout limit ', t)
+            th.start()
+            th.join(t)
+
+
             t += timeout * max(0, i-1)  # retry once with the same time out, then increase this time.
             if t > maxRetryTime:
                 break
@@ -1136,7 +1178,7 @@ def _checkExistingCompResult(compExcel, sourceDf, compResultFileBase):
     allCompResults = None
     with open(compExcel, 'rb') as f:
         cur_compExcelHash = md5(f.read()).hexdigest()
-    with NamedTemporaryFile() as f:
+    with NamedTemporaryFile(delete=False) as f:
         sourceDf.to_csv(f.name, sep='\t')
         cur_sDfHash = md5(f.read()).hexdigest()
     compResultFile, ext = os.path.splitext(compResultFileBase)
