@@ -5,9 +5,7 @@
 # c.du@biology.leidenuniv.nl
 # durand[dot]dc[at]hot[no space]mail.com
 ############################################
-# TODO make it compatable with windows
 # TODO hash in different file system do not work the same
-# NOT COMPATABLE WITH WINDOWS!!!!!!
 ############################################
 import os
 import pickle
@@ -692,15 +690,26 @@ def deseq2Process(
         vstDf = pd.read_csv(pathVst, sep='\t', header=0, index_col=0)
         return vstDf
 
-    rpackages.importr("DESeq2")
 
     logger.info('####### Process data using DESeq2 #######')
     tempDataFile = writeDataForDESeq2(dataDf)
     tempInfoFile, features = genInfoDfDESeq2(dataDf, metaDf)
+    design = features[designCol]
     logger.info('Fitting data using DESeq2...')
     idxName = dataDf.index.name
     tif = tempInfoFile.name.replace('\\', '\\\\')
     tdf = tempDataFile.name.replace('\\', '\\\\')
+    # Clean temp file (or Windows will raise "cannot find unused tempfile name"
+    # after several loops)
+    robjects.r(
+        """
+        rm(list = ls())
+        sapply(file.path(tempdir(), list.files(tempdir())), unlink)
+        gc()
+        """
+    )
+    rpackages.importr("DESeq2")
+    # Prepare DESeq2 input
     robjects.r(
         f"""
         coldata = read.csv('{tif}', sep='\t', row.names = 1, header = TRUE)
@@ -708,8 +717,6 @@ def deseq2Process(
         print(all(rownames(coldata) == colnames(cts)))
         """
     )
-
-    design = features[designCol]
 
     logger.info(f'Set factor for "design": "{design}"')
     robjects.r(
@@ -757,6 +764,8 @@ def deseq2Process(
             f"""
             vsd = vst(dds, blind=FALSE)
             write.table(assay(vsd), file='{pathVst}', sep='\t', col.names=NA)
+            rm(vsd)
+            gc()
             """
         )
         logger.info(pathVst)
