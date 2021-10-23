@@ -79,8 +79,18 @@ def loadMQLfqData(dataPath, minLfq=3):
         dataPath,
         'proteinGroups.txt'
     )
-    with open(proteinGroupFilePath, 'rb') as pg:
-        ha = md5(pg.read()).hexdigest()[:6]
+    proteinGroupsDf = pd.read_csv(
+        proteinGroupFilePath,
+        sep='\t',
+        header=0,
+        index_col='id',
+        # to use read in all data without warning.
+        # The table is quite complicated, and has
+        # mixed types for some columns if pandas
+        # infer data type of each column.
+        low_memory=False
+    )
+    ha = md5(proteinGroupsDf.to_json().encode()).hexdigest()[:6]
 
     lfqTableOut = os.path.join(
         dataTablesPath,
@@ -101,17 +111,6 @@ def loadMQLfqData(dataPath, minLfq=3):
         logger.info('LFQ data not found in program folder, start processing of proteinGroups.txt file.')
         # MaxQuant data processing
         logger.info(proteinGroupFilePath)
-        proteinGroupsDf = pd.read_csv(
-            proteinGroupFilePath,
-            sep='\t',
-            header=0,
-            index_col='id',
-            # to use read in all data without warning.
-            # The table is quite complicated, and has
-            # mixed types for some columns if pandas
-            # infer data type of each column.
-            low_memory=False
-        )
         logger.info('Remove "CON__" and "REV__" data')
         # remove 'CON__', 'REV__'
         proteinGroupsDf = proteinGroupsDf[
@@ -498,13 +497,7 @@ def calculateTPM(countTableDf, infoFiles,
     Returns:
         pd.DataFrame: TPM calculated
     """
-    with NamedTemporaryFile(delete=False) as f:
-        countTableDf.to_csv(f, sep='\t')
-        for p in [infoFiles, tagsForGeneName, lengthColParsingKeys, typeCol,
-                  str(removerRNA), removeIDsubstrings, removeIDcontains]:
-            f.write(''.join(p).encode())
-        f.seek(0)
-        paraHash = md5(f.read()).hexdigest()
+    paraHash = md5(countTableDf.to_json().encode()).hexdigest()[:6]
     if not os.path.isdir('dataTables'):
         os.makedirs('dataTables')
     tpmTablePath = f'dataTables/TPM_Table_{paraHash}.tsv'
@@ -518,6 +511,8 @@ def calculateTPM(countTableDf, infoFiles,
                                               removerRNA, removeIDsubstrings, removeIDcontains)
         tpmDf = _TPM(newct, geneLengths)
         tpmDf.to_csv(tpmTablePath, sep='\t')
+        # Read again from file ensuring the hash stays the same if reload
+        tpmDf = pd.read_csv(tpmTablePath, sep='\t', index_col=0)
         logger.info(f'TPM data write to table {tpmTablePath}.')
     return tpmDf
 
@@ -580,12 +575,11 @@ def getStats(dataDf, experiments):
     If you want to exclude any data, do that before passing data in here.
     """
     # calculate hash for parameters
-    with NamedTemporaryFile(delete=False) as f:
-        dataDf.to_csv(f.name, sep='\t')
-        f.write(''.join(experiments.keys()).encode())
-        f.write(''.join(''.join(experiments[k]) for k in experiments).encode())
-        f.seek(0)
-        tbHash = md5(f.read()).hexdigest()[:6]
+    hastr = md5(dataDf.to_json().encode()).digest()
+    hastr += ''.join(experiments.keys()).encode()
+    hastr += ''.join(''.join(experiments[k]) for k in experiments).encode()
+    tbHash = md5(hastr).hexdigest()[:6]
+
 
     meanTbFile = f'dataTables/mean_{tbHash}.tsv'
     nquantTbFile = f'dataTables/nquant_{tbHash}.tsv'
@@ -664,23 +658,22 @@ def deseq2Process(
 ):
     """
     Will return vstDf by default (deOnly = False).
-    If you want to do difference analysis, pass getDE=True
+    If you want to do difference analysis, pass deOnly=True
     """
     pathTransformed = os.path.join('dataTables', 'transformed')
     if not os.path.isdir(pathTransformed):
         os.makedirs(pathTransformed)
-    # calculate hash
-    with NamedTemporaryFile(delete=False) as f:
-        dataDf.to_csv(f.name)
-        with NamedTemporaryFile(delete=False) as g:
-            metaDf.to_csv(g.name)
-            mhb = md5(g.read()).digest()
-        f.write(mhb)
-        f.write(str(ref).encode())
-        f.write(str(deOnly).encode())
-        f.write(str(designCol).encode())
-        f.seek(0)
-        ha = md5(f.read()).hexdigest()[:6]
+
+    # Calculate hash
+    hastr = md5(dataDf.to_json().encode()).digest() # large dataset can be digested to save memory
+    hastr += md5(metaDf.to_json().encode()).digest()
+    hastr += str(ref).encode()
+    hastr += str(deOnly).encode()
+    hastr += str(designCol).encode()
+    ha = md5(hastr).hexdigest()[:6]
+
+    logger.info(f'Current deseq2Process parameter hash = {ha}')
+
 
     # TODO remove columns based on metaDf
 
@@ -756,6 +749,8 @@ def deseq2Process(
     )
     tempInfoFile.close()
     tempDataFile.close()
+    os.remove(tempInfoFile.name)
+    os.remove(tempDataFile.name)
     logger.info('END DESeq2 data init with current design:')
     if deOnly:
         return design
@@ -845,16 +840,15 @@ def processMSstats(mqDataPath, annotationPath):
     # calculate Hash
     pgPath = os.path.join(mqDataPath, "proteinGroups.txt")
     evPath = os.path.join(mqDataPath, 'evidence.txt')
-    haFile = NamedTemporaryFile(delete=False)
     with open(pgPath, 'rb') as f:
-        haFile.write(md5(f.read()).digest())
+        hastr = md5(f.read()).digest()
     with open(evPath, 'rb') as f:
-        haFile.write(md5(f.read()).digest())
+        hastr += md5(f.read()).digest()
     with open(annotationPath, 'rb') as f:
-        haFile.write(md5(f.read()).digest())
-    haFile.seek(0)
-    ha = md5(haFile.read()).hexdigest()[:6]
-    haFile.close()
+        hastr += md5(f.read()).digest()
+    ha = md5(hastr).hexdigest()[:6]
+    #haFile.close()
+    
 
     qcplotPath = f'dataTables/transformed/msstats_proposed_{ha}_QCPlot.pdf'
     proposedDataPath = f'dataTables/transformed/msstats_proposed_{ha}.tsv'
@@ -1054,7 +1048,7 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
     for c in sortedComps:
         exp = comparisons[c]['exp']
         ctr = comparisons[c]['ctr']
-        logger.info(f'Calculat comparisons {exp} vs. {ctr}.')
+        logger.info(f'Calculate comparisons {exp} vs. {ctr}.')
         if ctr == previousCtr:
             design = previousDesign
         else:
@@ -1093,20 +1087,26 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
             # print(os.path.getsize(subResFile.name))
             if i > 0:
                 logger.info(f'Failed to calculate comparison within {int(t/60)} min, retry.')
+                deseq2Process(countTable, metaDf, ref=ctr, deOnly=True)
             srf = subResFile.name.replace('\\', '\\\\')
 
-            #p = Process(target=_deseq2Comp, args=(a, b, name, extra, srf))
-            # subResFile.seek(0)  # Not necessary, r should write the file in R process
-            #print('timeout limit ', t)
-            # p.start()
-            # p.join(timeout=t)
+            # Add time out to function. Trust me with Thread or Process!!!
+            # _deseq2Comp() is an function calling R code by rpy2, needs to communicate with the
+            # only r kernel managed by rpy2. Add time out is just to retry when r kernel do not
+            # respond.
+            # In *nix system with Thread(), the died kernel stays no respond, so Process() needed.
+            # In Win, Process() will lose the contact with rpy2 kernel, only Thread() is safe and
+            # do not have the problem of no responding r kernel (or do not have the problem like
+            # above).
+            if sys.platform.startswith("win"):
+                th = Thread(target=_deseq2Comp, args=(a, b, name, extra, srf), daemon=True)
+                th.start()
+                th.join(t)
+            else:
+                p = Process(target=_deseq2Comp, args=(a, b, name, extra, srf), daemon=True)
+                p.start()
+                p.join(timeout=t)
 
-            th = Thread(target=_deseq2Comp, args=(a, b, name, extra, srf))
-            th.daemon = True
-            # subResFile.seek(0)  # Not necessary, r should write the file in R process
-            #print('timeout limit ', t)
-            th.start()
-            th.join(t)
 
             t += timeout * max(0, i-1)  # retry once with the same time out, then increase this time.
             if t > maxRetryTime:
@@ -1119,7 +1119,7 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
             logger.warning('Failed calculating comparison with ' +
                            f'{i} trials, max run time per trial is {maxRetryTime/60} min. ' +
                            f'The comparison {exp} vs {ctr} with name {c} ignored.')
-        subResFile.close()
+        os.remove(subResFile.name)
     # Write to compResultFile
     # Generate a dataframe that store all reulsts in one table like MSstats
     allCompDf = pd.DataFrame()
@@ -1186,9 +1186,7 @@ def _checkExistingCompResult(compExcel, sourceDf, compResultFileBase):
     allCompResults = None
     with open(compExcel, 'rb') as f:
         cur_compExcelHash = md5(f.read()).hexdigest()
-    with NamedTemporaryFile(delete=False) as f:
-        sourceDf.to_csv(f.name, sep='\t')
-        cur_sDfHash = md5(f.read()).hexdigest()
+    cur_sDfHash = md5(sourceDf.to_json().encode()).hexdigest()
     compResultFile, ext = os.path.splitext(compResultFileBase)
     compResultFile += f'_{cur_compExcelHash[:6]}_{cur_sDfHash[:6]}{ext}'
     if os.path.isfile(compResultFile):
@@ -1895,7 +1893,7 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
 
 
 def calculateVips(model):
-    """calculat VIP (Variable Importance in Projection) for V-plot
+    """calculate VIP (Variable Importance in Projection) for V-plot
     https://www.researchgate.net/post/How_can_I_compute_Variable_Importance_in_Projection_VIP_in_Partial_Least_Squares_PLS
     Solution by Keiron Teilo O'Shea """
     t = model.x_scores_
