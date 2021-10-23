@@ -339,6 +339,8 @@ def _parseTableForGeneLength(tableFile, lengthColParsingKeys=['length'],
         sep = '\t'
     elif ext in ['.csv']:
         sep = ','
+    else:
+        sep = ' '
     try:
         tb = pd.read_csv(tableFile, sep=sep, index_col=0, header=0, comment='#')
     except UnicodeDecodeError:  # if file extension .xls is indeed excel file
@@ -498,8 +500,8 @@ def calculateTPM(countTableDf, infoFiles,
     """
     with NamedTemporaryFile(delete=False) as f:
         countTableDf.to_csv(f, sep='\t')
-        for p in [infoFiles, tagsForGeneName, lengthColParsingKeys, typeCol, 
-            str(removerRNA), removeIDsubstrings, removeIDcontains]:
+        for p in [infoFiles, tagsForGeneName, lengthColParsingKeys, typeCol,
+                  str(removerRNA), removeIDsubstrings, removeIDcontains]:
             f.write(''.join(p).encode())
         f.seek(0)
         paraHash = md5(f.read()).hexdigest()
@@ -511,9 +513,9 @@ def calculateTPM(countTableDf, infoFiles,
         logger.info(f'TPM data read from {tpmTablePath}.')
     else:
         newct, geneLengths = _cleanCountTable(countTableDf, infoFiles,
-                                            tagsForGeneName,
-                                            lengthColParsingKeys, typeCol,
-                                            removerRNA, removeIDsubstrings, removeIDcontains)
+                                              tagsForGeneName,
+                                              lengthColParsingKeys, typeCol,
+                                              removerRNA, removeIDsubstrings, removeIDcontains)
         tpmDf = _TPM(newct, geneLengths)
         tpmDf.to_csv(tpmTablePath, sep='\t')
         logger.info(f'TPM data write to table {tpmTablePath}.')
@@ -541,14 +543,14 @@ def removeExperiments(metaDf, experiments, toRemove, dataDf=None):
         exps = [e for e in experiments[c] if e not in toRemove]
         if len(exps) > 0:
             newExps[c] = exps
-            newMetaDf = pd.concat((newMetaDf, metaDf.loc[metaDf['Experiment'].isin(exps),:]), axis=0)
-    
+            newMetaDf = pd.concat((newMetaDf, metaDf.loc[metaDf['Experiment'].isin(exps), :]), axis=0)
+
     if isinstance(dataDf, type(None)):
         newDataDf = None
     else:
         newDataDf = dataDf.loc[:, dataDf.columns.isin(toRemove)]
     newConditions = list(newExps.keys())
-    
+
     return newMetaDf, newConditions, newExps, newDataDf
 
 
@@ -583,8 +585,8 @@ def getStats(dataDf, experiments):
         f.write(''.join(experiments.keys()).encode())
         f.write(''.join(''.join(experiments[k]) for k in experiments).encode())
         f.seek(0)
-        tbHash = md5(f.read()).hexdigest()[:6] 
-        
+        tbHash = md5(f.read()).hexdigest()[:6]
+
     meanTbFile = f'dataTables/mean_{tbHash}.tsv'
     nquantTbFile = f'dataTables/nquant_{tbHash}.tsv'
     varTbFile = f'dataTables/var_{tbHash}.tsv'
@@ -619,7 +621,7 @@ def getStats(dataDf, experiments):
             [mean, n, var, std, sem]
         ):
             df.loc[:, c] = x
-    
+
     for df, f in zip([meanDf, nquantDf, varDf, stdDf, semDf], outputFiles):
         df.to_csv(f, sep='\t')
         logger.info(f'Write basic stats data to {f}.')
@@ -664,7 +666,7 @@ def deseq2Process(
     Will return vstDf by default (deOnly = False).
     If you want to do difference analysis, pass getDE=True
     """
-    pathTransformed = os.path.join('dataTables','transformed')
+    pathTransformed = os.path.join('dataTables', 'transformed')
     if not os.path.isdir(pathTransformed):
         os.makedirs(pathTransformed)
     # calculate hash
@@ -679,7 +681,7 @@ def deseq2Process(
         f.write(str(designCol).encode())
         f.seek(0)
         ha = md5(f.read()).hexdigest()[:6]
-        
+
     # TODO remove columns based on metaDf
 
     pathVst = os.path.join(pathTransformed, f'vst_{ha}.tsv')
@@ -689,7 +691,6 @@ def deseq2Process(
         logger.info(f'Read VST transformed data from {pathVst}.')
         vstDf = pd.read_csv(pathVst, sep='\t', header=0, index_col=0)
         return vstDf
-
 
     logger.info('####### Process data using DESeq2 #######')
     tempDataFile = writeDataForDESeq2(dataDf)
@@ -734,11 +735,11 @@ def deseq2Process(
         coldata${design} = relevel(coldata${design}, ref=as.character("{ref}"))
         """
     )
-    #robjects.r(
+    # robjects.r(
     #    f"""
     #    print(coldata${design})
     #    """
-    #)
+    # )
     robjects.r(
         f"""
         dds = DESeqDataSetFromMatrix(
@@ -800,9 +801,9 @@ def prepareMSstats(mqDataPath, annotationPath):
     pgPath = os.path.join(mqDataPath, "proteinGroups.txt")
     evPath = os.path.join(mqDataPath, 'evidence.txt')
     logger.info('Read MaxQuant data')
-    annotationPath = annotationPath.replace('\\','\\\\')
-    pgPath = pgPath.replace('\\','\\\\')
-    evPath = evPath.replace('\\','\\\\')
+    annotationPath = annotationPath.replace('\\', '\\\\')
+    pgPath = pgPath.replace('\\', '\\\\')
+    evPath = evPath.replace('\\', '\\\\')
     robjects.r(
         f"""
         proteinGroups <- read.table(
@@ -865,7 +866,7 @@ def processMSstats(mqDataPath, annotationPath):
     else:
         prepareMSstats(mqDataPath, annotationPath)
         logger.info('Write proposed data to table')
-        proposedDataPath = proposedDataPath.replace('\\','\\\\')
+        proposedDataPath = proposedDataPath.replace('\\', '\\\\')
         logger.info(proposedDataPath)
         robjects.r(
             f"""
@@ -980,7 +981,7 @@ def msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile):
 #     print(levels(maxquant.proposed$ProteinLevelData$GROUP))
 #     print(comparisons)
 #     """)
-    compResultFile = compResultFile.replace('\\','\\\\')
+    compResultFile = compResultFile.replace('\\', '\\\\')
     robjects.r(
         f"""
         maxquant.comparisons <- groupComparison(
@@ -1016,9 +1017,9 @@ def _deseq2Comp(a, b, name, extra, subResFileName):
                     file="{subResFileName}")
         #print("{subResFileName}")
         """
-    #print(rstr)
+    # print(rstr)
     robjects.r(rstr)
-    #print('Done')
+    # print('Done')
 
 
 def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrink=True, timeout=100):
@@ -1089,25 +1090,23 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
         subResFile.close()
         #print('temp file name after close ', subResFile.name)
         while os.path.getsize(subResFile.name) == 0:
-            #print(os.path.getsize(subResFile.name))
+            # print(os.path.getsize(subResFile.name))
             if i > 0:
                 logger.info(f'Failed to calculate comparison within {int(t/60)} min, retry.')
             srf = subResFile.name.replace('\\', '\\\\')
 
             #p = Process(target=_deseq2Comp, args=(a, b, name, extra, srf))
-            ##subResFile.seek(0)  # Not necessary, r should write the file in R process
+            # subResFile.seek(0)  # Not necessary, r should write the file in R process
             #print('timeout limit ', t)
-            #p.start()
-            #p.join(timeout=t)
-
+            # p.start()
+            # p.join(timeout=t)
 
             th = Thread(target=_deseq2Comp, args=(a, b, name, extra, srf))
             th.daemon = True
-            #subResFile.seek(0)  # Not necessary, r should write the file in R process
+            # subResFile.seek(0)  # Not necessary, r should write the file in R process
             #print('timeout limit ', t)
             th.start()
             th.join(t)
-
 
             t += timeout * max(0, i-1)  # retry once with the same time out, then increase this time.
             if t > maxRetryTime:
@@ -1170,7 +1169,7 @@ def genComparisonResults(compResultFile, comparisons):
         # for non-shrinked data
         targetCols = ['log2FC', 'SE', 'pvalue', 'adj.pvalue', 'baseMean']
     else:
-        raise
+        raise ValueError("Do not know result type, make sure 'ImputationPercentage' or 'baseMean' in input data columns")
 
     allCompResults = {}
     for c in comparisons:
@@ -1243,7 +1242,7 @@ def makeCompMatrixMsstats(compExcel, mqDataPath, annotationPath):
     # If not, read from existing result if have.
     compResultFileBase = 'dataTables/transformed/msstats_proposed_comparisonResult.tsv'
 
-    lfqDf, _ = loadMQLfqData(mqDataPath) # only used for check if result exists, to avoid extensive R calls
+    lfqDf, _ = loadMQLfqData(mqDataPath)  # only used for check if result exists, to avoid extensive R calls
     allCompResults, comparisons, compResultFile = \
         _checkExistingCompResult(compExcel, lfqDf, compResultFileBase)
     if not isinstance(allCompResults, type(None)):
@@ -1309,8 +1308,6 @@ def makeCompMatrixDeseq2(compExcel, countTable, annotationPath, shrink=None):
     allCompResults = genComparisonResults(compResultFile, comparisons)
     logger.info(f'Done calculation, dump data in {compResultFile}\n')
     return allCompResults, comparisons
-
-
 
 
 def square_subplots(fig, axs):
@@ -1390,7 +1387,6 @@ def genColour(idx, sep='_', cmap='turbo'):
         sgap = 0.5*gap/n
         colours.extend(np.linspace(mc, mc+0.5*gap-sgap, n))
     return [cmap(i) for i in colours]
-
 
 
 def genPlsClasses(idx, sep='_'):
@@ -1486,7 +1482,7 @@ def getNtopVar(df, ntop=300):
     Args:
         df (pd.DataFrame): data table
         ntop (int, optional): number of elements to keep. Defaults to 300.
-    
+
     Return:
         newDf: containing only ntop elements (rows)
     """
@@ -1497,7 +1493,7 @@ def getNtopVar(df, ntop=300):
     vs = vs.sort_values(ascending=False)
     newDf = df.loc[vs.iloc[:ntop].index, :]
     return newDf
-    
+
 
 def doPCA(df, ntop=None):
     """do PCA on df, return pca table and PcaClass
@@ -1524,7 +1520,6 @@ def doPCA(df, ntop=None):
     return pcaDF, PcaClass
 
 
-
 def doPLS(df, classes=None, ntop=None, n_components=2):
     """do supervised PLS analysis on df, return pls data, PlsClass, and R2 of the fit
 
@@ -1536,7 +1531,7 @@ def doPLS(df, classes=None, ntop=None, n_components=2):
         ntop (int, optional): Only take the top n variance elements for computing. Defaults to None.
                               Defaults to None.
         n_components (int, optional): Number of components that PLS will use. Defaults to 2.
-    
+
     Return:
         plsDf, PlsClass, r2
     """
@@ -1573,6 +1568,7 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
         cols = df.columns
     if analysisType == "PCA":
         paDf, PaClass = doPCA(df, ntop=ntop)
+        r2 = None
     elif analysisType == 'PLS':
         if isinstance(plsClasses, type(None)):
             plsClasses = genPlsClasses(df.columns)
@@ -1580,7 +1576,7 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
             logger.info(plsClasses)
         paDf, PaClass, r2 = doPLS(df, plsClasses, ntop=ntop)
     else:
-        raise
+        raise ValueError(f'analysisType needs to be one of "PCA", "PLS", {analysisType} is not supported.')
 #     print(paDf.head())
     directory = f'Plots/{analysisType}/'
     name = f'{analysisType}_{title}'
@@ -1756,6 +1752,7 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
         paDf, PaClass = doPCA(df, ntop=ntop)
         dfComp = pd.DataFrame(PaClass.components_.transpose(),
                               index=df.index, columns=paDf.columns)
+        r2 = None
     elif analysisType == 'PLS':
         if isinstance(plsClasses, type(None)):
             plsClasses = genPlsClasses(df.columns)
@@ -1765,7 +1762,7 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
         dfComp = pd.DataFrame(PaClass.x_loadings_,
                               index=df.index, columns=paDf.columns)
     else:
-        raise
+        raise ValueError("Do not know result type, make sure 'ImputationPercentage' or 'baseMean' in input data columns")
 
     directory = f'Plots/{analysisType}/'
     name = f'{analysisType}_{title}'
@@ -1895,7 +1892,6 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
     dfPlot.to_excel(f'{filePath}.xlsx')
 
     plt.show()
-
 
 
 def calculateVips(model):
@@ -2076,7 +2072,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     elif 'baseMean' in compDf.columns:
         prog = 'DESeq2'
     else:
-        raise
+        raise ValueError("Do not know result type, make sure 'ImputationPercentage' or 'baseMean' in input data columns")
 
     directory = f'Plots/Volcano/'
     if not os.path.isdir(directory):
@@ -2105,8 +2101,8 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
 
     if not isinstance(xmax, type(None)):
         xmax = xmax*1.1
-        log2fc.loc[log2fc> xmax] = np.inf
-        log2fc.loc[log2fc< -xmax] = -np.inf
+        log2fc.loc[log2fc > xmax] = np.inf
+        log2fc.loc[log2fc < -xmax] = -np.inf
     else:
         # Set positive and negative X range equal
         xmax = np.abs(log2fc[np.isfinite(log2fc)]).max() * 1.1
@@ -2115,8 +2111,8 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     log2fc = log2fc.replace(-np.inf, -xmax)
 
     if not isinstance(ymax, type(None)):
-        ymax = ymax *1.1
-        procPval.loc[procPval>ymax] = np.inf
+        ymax = ymax * 1.1
+        procPval.loc[procPval > ymax] = np.inf
     else:
         ymax = procPval[np.isfinite(procPval)].max() * 1.1
     ymin = 0 - ymax/1.1*0.05
@@ -2202,7 +2198,6 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     vFilledDf.columns = [c+'_filled' for c in vFilledDf.columns]
     vFilledDf.to_excel(f'{filePath}_filled.xlsx')
     vDf.to_excel(f'{filePath}.xlsx')
-
 
 
 # Query subset
