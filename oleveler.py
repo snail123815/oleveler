@@ -5,8 +5,8 @@
 # c.du@biology.leidenuniv.nl
 # durand[dot]dc[at]hot[no space]mail.com
 ############################################
-# TODO hash in different file system do not work the same
-############################################
+
+
 import os
 import pickle
 import logging
@@ -189,7 +189,6 @@ def loadMeta(path, toRemove=[]):
     logger.info(f'Metadata path: {path}')
     metaDf = pd.read_csv(path, index_col=0)
     assert not metaDf.index[0].endswith('.raw'), f'Please remove ".raw" from table {path}'
-    #metaDf.index = [i.replace('.raw','') for i in metaDf.index]
     metaDf = metaDf[~metaDf['Experiment'].isin(toRemove)]
     conditions = list(set(metaDf.Condition.to_list()))
     conditions.sort()
@@ -663,6 +662,14 @@ def deseq2Process(
     pathTransformed = os.path.join('dataTables', 'transformed')
     if not os.path.isdir(pathTransformed):
         os.makedirs(pathTransformed)
+    # Remove columns based on metaDf
+    newCol = []
+    for e in metaDf.index:
+        if e in dataDf.columns:
+            newCol.append(e)
+        else:
+            logger.info(f'{e} not in data table.')
+    dataDf = dataDf.loc[:, newCol]
 
     # Calculate hash
     hastr = md5(dataDf.to_json().encode()).digest() # large dataset can be digested to save memory
@@ -675,7 +682,6 @@ def deseq2Process(
     logger.info(f'Current deseq2Process parameter hash = {ha}')
 
 
-    # TODO remove columns based on metaDf
 
     pathVst = os.path.join(pathTransformed, f'vst_{ha}.tsv')
     pathVst = pathVst.replace('\\', '\\\\')
@@ -728,11 +734,6 @@ def deseq2Process(
         coldata${design} = relevel(coldata${design}, ref=as.character("{ref}"))
         """
     )
-    # robjects.r(
-    #    f"""
-    #    print(coldata${design})
-    #    """
-    # )
     robjects.r(
         f"""
         dds = DESeqDataSetFromMatrix(
@@ -765,9 +766,7 @@ def deseq2Process(
             """
         )
         logger.info(pathVst)
-
         logger.info('####### END Processing data using DESeq2 #######')
-
         vstDf = pd.read_csv(pathVst, sep='\t', header=0, index_col=0)
         return vstDf
 
@@ -900,7 +899,6 @@ def processMSstats(mqDataPath, annotationPath):
         pgIds.sort()
         runIds = pd.unique(quantTable.originalRUN)
         runIds.sort()
-    #     run2exp = metaDf.Experiment.to_dict()
         metaDf, _, _ = loadMeta(annotationPath)
         run2exp = metaDf.Experiment.to_dict()
         logDf = pd.DataFrame(index=pgIds)
@@ -966,15 +964,6 @@ def msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile):
             """
         )
     logger.info(f'Calculating comparisons...')
-#     robjects.r(
-#     """
-#     print('group')
-#     print(head(maxquant.proposed$ProteinLevelData$Group))
-#     print('data')
-#     print(head(maxquant.proposed$ProteinLevelData))
-#     print(levels(maxquant.proposed$ProteinLevelData$GROUP))
-#     print(comparisons)
-#     """)
     compResultFile = compResultFile.replace('\\', '\\\\')
     robjects.r(
         f"""
@@ -1001,8 +990,6 @@ def msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile):
 
 
 def _deseq2Comp(a, b, name, extra, subResFileName):
-    #print('start ', subResFileName)
-    #print(a, b, name, extra)
     rstr = f"""
         #print(resultsNames(dds))
         res <- {a}(dds, {b}="{name}", parallel=TRUE{extra})
@@ -1011,9 +998,9 @@ def _deseq2Comp(a, b, name, extra, subResFileName):
                     file="{subResFileName}")
         #print("{subResFileName}")
         """
-    # print(rstr)
+    # Do not directly use f string in r() function here, for maximal compatibility with
+    # Thread() in Windows 
     robjects.r(rstr)
-    # print('Done')
 
 
 def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrink=True, timeout=100):
@@ -1106,8 +1093,6 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
                 p = Process(target=_deseq2Comp, args=(a, b, name, extra, srf), daemon=True)
                 p.start()
                 p.join(timeout=t)
-
-
             t += timeout * max(0, i-1)  # retry once with the same time out, then increase this time.
             if t > maxRetryTime:
                 break
@@ -1142,9 +1127,6 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
 
 
 def genComparisonResults(compResultFile, comparisons):
-
-    #     newCompDf = pd.Dataframe()
-    #     newCompTablePath = 'dataTables/transformed/msstats_proposed_comparisonResult_readable.tsv'
     """
     allComparisons - dict of {'comp1':DF, 'comp2':DF,...}
 
@@ -1540,17 +1522,12 @@ def doPLS(df, classes=None, ntop=None, n_components=2):
         classes = np.array(classes)
     if ntop != None:
         df = getNtopVar(df, ntop=ntop)
-#     print(df.T.shape)
-#     print(classes.shape)
     x_scores, y_scores = PlsClass.fit_transform(df.T, classes)
     plsDf = pd.DataFrame(x_scores, index=df.columns,
                          columns=[f"PC{i+1}" for i in range(n_components)],)
     r2 = PlsClass.score(df.T, classes)
-#     print(PlsClass.x_loadings_.shape)
     logger.info(f"PLS: Coefficient of determination R^2: {r2}")
     return plsDf, PlsClass, r2
-
-# doPLS(vstDf, genClasses(vstDf.columns))
 
 
 def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
@@ -1575,7 +1552,6 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
         paDf, PaClass, r2 = doPLS(df, plsClasses, ntop=ntop)
     else:
         raise ValueError(f'analysisType needs to be one of "PCA", "PLS", {analysisType} is not supported.')
-#     print(paDf.head())
     directory = f'Plots/{analysisType}/'
     name = f'{analysisType}_{title}'
     if not os.path.isdir(directory):
@@ -1597,9 +1573,7 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
     colours = []
     labels = []
     legends = []
-#     print(experiments)
 
-    # markerTypes = cycle(["o", "s", "^", "d", "p", "P", "*"])
     for i, col in enumerate(cols):
         labels.append(col)
         if colourSet == None:
@@ -1673,7 +1647,6 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
             lnv.set_visible(False)
             lnh.set_visible(False)
     fig.canvas.mpl_connect("motion_notify_event", hover)
-#     plt.tight_layout()
     if square:
         square_subplots(fig, ax)
     logger.info(f'PCA plot generated with path {filePath}\n')
@@ -1696,7 +1669,6 @@ def plotPCAExplaination(PcaClass, title=""):
     for i, ratio in enumerate(explainedRatios):
         ax.text(i + 1, ratio, f"{ratio:.2%}",
                 ha="center", va="bottom", size="xx-small")
-#     ax.set_yticklabels([f"{y:.0%}" for y in ax.get_yticks()])
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     ax.set_ylabel("Explained variance ratio")
     ax.set_xticklabels([f"PC{x}" for x in xaxis], size="x-small")
@@ -1731,10 +1703,10 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
                                  outlierAlg=0, outliersFraction=0.05, square=True,
                                  analysisType='PCA', plsClasses=None):
     """
-# plotPrincipleAnalysisLoading(vstDf, drawOutliers=True, outlierAlg=0, outliersFraction=0.05, title='VST',
-#                              analysisType="PCA")
-# plotPrincipleAnalysisLoading(vstDf, drawOutliers=True, outlierAlg=0, outliersFraction=0.05, title='VST',
-#                              analysisType="PLS")
+    plotPrincipleAnalysisLoading(vstDf, drawOutliers=True, outlierAlg=0, outliersFraction=0.05, title='VST',
+                                 analysisType="PCA")
+    plotPrincipleAnalysisLoading(vstDf, drawOutliers=True, outlierAlg=0, outliersFraction=0.05, title='VST',
+                                 analysisType="PLS")
     Do normalization before pass DataFrame here 
     outliersFraction=0.05,  # precentage of outliers
     """
@@ -2234,8 +2206,6 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
         realIds.extend(list(corrId))
     meanDf = meanDf.loc[realIds, :]
     barDf = barDf.loc[realIds, :]
-#     print(meanDf)
-#     print(barDf)
 
     conditions = np.array(conditions)
     groups = []
