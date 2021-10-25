@@ -1638,7 +1638,7 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
     if rotation != 0:
         filePath += f'_rotated{rotation}_'
         dataPlot = _rotateAxis(rotation, dataPlot)
-    filePath += ha
+    filePath += f'_{ha}'
 
     experiments = dataPlot.index
     colours = []
@@ -2323,7 +2323,9 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
     """
     ha = calHash(meanDf, barDf, ids, conditions, figsize, title, ylims, xs,
           plotType, queryConditionGroupNames, xlabels, xlabelRotation)
-    plotName = f'query_{plotType}_{title}_{ids}_{ha}'
+    if isinstance(ids, str):
+        ids = [ids]
+    plotName = f'query_{plotType}_{title}_{"_".join([i for i in ids[:2]])}_{ha}'
     logger.info(f'Query with name: {plotName}')
     plt.close(plotName)
     # Normalise meanDf,
@@ -2333,8 +2335,6 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
     barDf = pd.DataFrame(Scaler.transform(barDf), index=barDf.index, columns=barDf.columns)
 
     # Deal if given id is part of the id
-    if isinstance(ids, str):
-        ids = [ids]
     realIds = []
     for i in ids:
         corrId = meanDf.index[meanDf.index.str.contains(i)]
@@ -2444,7 +2444,7 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
     if os.path.isfile(tabFile):
         logger.info(f'Table file exists: {tabFile}')
     else:
-        logger.info(f'Save query table at {figFile}')
+        logger.info(f'Save query table at {tabFile}')
         saveBarDf = barDf
         saveBarDf.columns = [str(c)+'_bar' for c in barDf.columns]
         pd.concat((meanDf, saveBarDf), axis=1).to_excel(tabFile)
