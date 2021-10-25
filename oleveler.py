@@ -2446,7 +2446,7 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
     else:
         logger.info(f'Save query table at {figFile}')
         saveBarDf = barDf
-        saveBarDf.columns = [c+'_bar' for c in barDf.columns]
+        saveBarDf.columns = [str(c)+'_bar' for c in barDf.columns]
         pd.concat((meanDf, saveBarDf), axis=1).to_excel(tabFile)
     
     plt.show()
