@@ -1512,12 +1512,12 @@ def plotCorr(df, cols=None, method='pearson', fontsize=6, figsize=(6, 5),
     figFile = os.path.join(saveDir, plotName+'.svg')
     tabFile = os.path.join(saveDir, plotName+'.xlsx')
     if os.path.isfile(figFile):
-        logger.log(f'Correlation plot exists: {figFile}')
+        logger.info(f'Correlation plot exists: {figFile}')
     else:
-        logger.log(f'Save correlation plot at {figFile}')
+        logger.info(f'Save correlation plot at {figFile}')
         fig.savefig(figFile)
     if os.path.isfile(tabFile):
-        logger.log(f'Correlation data exists: {tabFile}')
+        logger.info(f'Correlation data exists: {tabFile}')
     else:
         logger.info(f'Save correlation data at {tabFile}')
         corrDf.to_excel(tabFile)
