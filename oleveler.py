@@ -2026,7 +2026,7 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
     name += "_".join(cols[:min(len(cols), 2)])
     if len(cols) > 2:
         name += '...'
-    name += ha
+    name += f'_{ha}'
     filePath = os.path.join(directory, name)
 
     # Size set in scatter plot is the suface of the point
