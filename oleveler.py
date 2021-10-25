@@ -664,7 +664,7 @@ def deseq2Process(
         os.makedirs(pathTransformed)
     # Remove columns based on metaDf
     newCol = []
-    for e in metaDf.index:
+    for e in metaDf.Experiment:
         if e in dataDf.columns:
             newCol.append(e)
         else:
