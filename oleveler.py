@@ -11,6 +11,7 @@ import os
 import pickle
 import logging
 import sys
+import json
 from multiprocessing import Process
 from threading import Thread
 from tempfile import NamedTemporaryFile
@@ -20,6 +21,7 @@ from collections import OrderedDict
 from time import sleep  # may be used in the notebook
 
 import numpy as np
+from numpy.lib.arraysetops import isin
 import pandas as pd
 from pandas.errors import EmptyDataError
 
@@ -72,8 +74,7 @@ def loadMQLfqData(dataPath, minLfq=3):
     logger.info("####### MaxQuant LFQ data input #######")
     scriptPath = './'
     dataTablesPath = os.path.join(scriptPath, 'dataTables')
-    if not os.path.isdir(dataTablesPath):
-        os.makedirs(dataTablesPath)
+    os.makedirs(dataTablesPath, exist_ok=True)
 
     proteinGroupFilePath = os.path.join(
         dataPath,
@@ -497,8 +498,7 @@ def calculateTPM(countTableDf, infoFiles,
         pd.DataFrame: TPM calculated
     """
     paraHash = md5(countTableDf.to_json().encode()).hexdigest()[:6]
-    if not os.path.isdir('dataTables'):
-        os.makedirs('dataTables')
+    os.makedirs('dataTables', exist_ok=True)
     tpmTablePath = f'dataTables/TPM_Table_{paraHash}.tsv'
     if os.path.isfile(tpmTablePath):
         tpmDf = pd.read_csv(tpmTablePath, sep='\t', index_col=0)
@@ -578,7 +578,6 @@ def getStats(dataDf, experiments):
     hastr += ''.join(experiments.keys()).encode()
     hastr += ''.join(''.join(experiments[k]) for k in experiments).encode()
     tbHash = md5(hastr).hexdigest()[:6]
-
 
     meanTbFile = f'dataTables/mean_{tbHash}.tsv'
     nquantTbFile = f'dataTables/nquant_{tbHash}.tsv'
@@ -660,8 +659,7 @@ def deseq2Process(
     If you want to do difference analysis, pass deOnly=True
     """
     pathTransformed = os.path.join('dataTables', 'transformed')
-    if not os.path.isdir(pathTransformed):
-        os.makedirs(pathTransformed)
+    os.makedirs(pathTransformed, exist_ok=True)
     # Remove columns based on metaDf
     newCol = []
     for e in metaDf.Experiment:
@@ -672,7 +670,7 @@ def deseq2Process(
     dataDf = dataDf.loc[:, newCol]
 
     # Calculate hash
-    hastr = md5(dataDf.to_json().encode()).digest() # large dataset can be digested to save memory
+    hastr = md5(dataDf.to_json().encode()).digest()  # large dataset can be digested to save memory
     hastr += md5(metaDf.to_json().encode()).digest()
     hastr += str(ref).encode()
     hastr += str(deOnly).encode()
@@ -680,8 +678,6 @@ def deseq2Process(
     ha = md5(hastr).hexdigest()[:6]
 
     logger.info(f'Current deseq2Process parameter hash = {ha}')
-
-
 
     pathVst = os.path.join(pathTransformed, f'vst_{ha}.tsv')
     pathVst = pathVst.replace('\\', '\\\\')
@@ -775,8 +771,7 @@ def deseq2Process(
 
 
 def clearlogfiles(msstatsLogPath='dataTables/transformed/MSstats_log/'):
-    if not os.path.isdir(msstatsLogPath):
-        os.makedirs(msstatsLogPath)
+    os.makedirs(msstatsLogPath, exist_ok=True)
     # move log file to log folder
     for f in os.listdir():
         if f.startswith('MSstats_') and f.endswith('.log'):
@@ -846,8 +841,7 @@ def processMSstats(mqDataPath, annotationPath):
     with open(annotationPath, 'rb') as f:
         hastr += md5(f.read()).digest()
     ha = md5(hastr).hexdigest()[:6]
-    #haFile.close()
-    
+    # haFile.close()
 
     qcplotPath = f'dataTables/transformed/msstats_proposed_{ha}_QCPlot.pdf'
     proposedDataPath = f'dataTables/transformed/msstats_proposed_{ha}.tsv'
@@ -1003,7 +997,7 @@ def _deseq2Comp(a, b, name, extra, subResFileName):
         #print("{subResFileName}")
         """
     # Do not directly use f string in r() function here, for maximal compatibility with
-    # Thread() in Windows 
+    # Thread() in Windows
     robjects.r(rstr)
 
 
@@ -1423,6 +1417,58 @@ def _rotateAxis(alpha, df):
     return rotated
 
 
+def orderDict(di):
+    try:
+        d = di.copy()
+    except:
+        d = di
+    if isinstance(d, dict):
+        od = OrderedDict(sorted(d.items()))
+        for k, v in od.items():
+            v = orderDict(v)
+            od[str(k)] = v
+        d = od
+    elif isinstance(d, (list, tuple, set)):
+        d = [orderDict(el) for el in d]
+    else:
+        d = str(d).strip()
+    return d
+
+
+def hashDict(di):
+    od = orderDict(di)
+    ha = md5(
+        json.dumps(
+            od,
+            sort_keys=True,
+            ensure_ascii=True,
+            default=str
+        ).encode()
+    ).digest()
+    return ha
+
+
+def calHash(*args):
+    # not safe with nested objects
+    hastr = ''.encode()
+    for arg in args:
+        if isinstance(arg, pd.core.frame.DataFrame) or isinstance(arg, pd.core.series.Series):
+            hastr += md5(arg.to_json().encode()).digest()
+        elif isinstance(arg, str):
+            hastr += arg.encode()
+        elif isinstance(arg, set):
+            hastr += str(sorted(list())).encode()
+        elif isinstance(arg, dict):
+            hastr += hashDict(arg)
+        elif isinstance(arg, PCA):
+            hastr += arg.components_.tobytes()
+        elif isinstance(arg, PLS):
+            hastr += arg.x_loadings_.tobytes()
+        else:
+            hastr += str(arg).encode()
+    return md5(hastr).hexdigest()[:6]
+
+
 def plotCorr(df, cols=None, method='pearson', fontsize=6, figsize=(6, 5),
              vmin=0.9, vmax=1, colormap='Greens'):
     """Make correlation plot for the data. Each column treated as one element
@@ -1438,12 +1484,15 @@ def plotCorr(df, cols=None, method='pearson', fontsize=6, figsize=(6, 5),
         vmax (int, optional): maximum correlation to plot. Defaults to 1.
         colormap (str, optional): colormap name used in matplotlib. Defaults to 'Greens'.
     """
+    ha = calHash(df, cols, method, fontsize, figsize, vmin, vmax, colormap)
     if not isinstance(cols, type(None)):
         df = df.loc[:, cols]
     else:
         cols = df.columns
     corrDf = df.corr(method=method)
-    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    plotName = f'Correlation plot {ha}'
+    plt.close(plotName)
+    fig, ax = plt.subplots(1, 1, figsize=figsize, num=plotName)
     pcm = ax.pcolormesh(corrDf, vmin=vmin, vmax=vmax, cmap=colormap)
     ticks = np.arange(0.5, df.shape[1]+0.5, 1)
     ax.set_xticks(ticks)
@@ -1454,6 +1503,11 @@ def plotCorr(df, cols=None, method='pearson', fontsize=6, figsize=(6, 5),
     ax.set_ylim(ax.get_ylim()[::-1])
     ax.set_title('Correlation Matrix')
     fig.colorbar(pcm, ax=ax)
+    saveDir = 'Plots/Correlation'
+    os.makedirs(saveDir, exist_ok=True)
+    savePath = os.path.join(saveDir, plotName+'.svg')
+    fig.savefig(savePath)
+    logger.info(f'Correlation plot saved to {savePath}.')
     plt.tight_layout()
     plt.show()
 
@@ -1538,7 +1592,10 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
                           title="", colourSet=None, rotation=0, sciLabel=False,
                           analysisType='PCA', plsClasses=None, square=True):
     """ Use normalised data for plotting, if not, data cannot contain nan valuse"""
-    plotName = f'{analysisType} plot - {title}'
+    ha = calHash(df, cols, note, ntop, figsize,
+                 title, colourSet, rotation, sciLabel,
+                 analysisType, plsClasses, square)
+    plotName = f'{analysisType} plot - {title}_{ha}'
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
     if cols != None:
@@ -1558,8 +1615,7 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
         raise ValueError(f'analysisType needs to be one of "PCA", "PLS", {analysisType} is not supported.')
     directory = f'Plots/{analysisType}/'
     name = f'{analysisType}_{title}'
-    if not os.path.isdir(directory):
-        os.makedirs(directory)
+    os.makedirs(directory, exist_ok=True)
     name += ('_' if title != '' else '')
     name += "_".join(cols[:min(len(cols), 2)])
     if len(cols) > 2:
@@ -1570,8 +1626,7 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
     if rotation != 0:
         filePath += f'_rotated{rotation}_'
         dataPlot = _rotateAxis(rotation, dataPlot)
-    timeStr = datetime.now().strftime("%Y%m%d%H%M%S")
-    filePath += timeStr
+    filePath += ha
 
     experiments = dataPlot.index
     colours = []
@@ -1661,12 +1716,13 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
 
 
 def plotPCAExplaination(PcaClass, title=""):
-    plotName = f'PCA explaination - {title}'
+    ha = calHash(PcaClass, title)
+    plotName = f'PCA_explaination_{title}{ha}'
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
     explainedRatios = PcaClass.explained_variance_ratio_
     explainedRatios = [r for r in explainedRatios if r >= 0.01]
-    _, ax = plt.subplots(1, 1, num=plotName)
+    fig, ax = plt.subplots(1, 1, num=plotName)
     xaxis = np.arange(1, len(explainedRatios) + 1)
     ax.bar(xaxis, explainedRatios)
     ax.set_xticks(xaxis)
@@ -1680,6 +1736,9 @@ def plotPCAExplaination(PcaClass, title=""):
     ax.set_title(
         f"Explained variance in different principal components"
     )
+    saveDir = 'Plots/PCA'
+    os.makedirs(saveDir, exist_ok=True)
+    fig.savefig(os.path.join(saveDir, plotName))
     plt.show()
 
 
@@ -1714,7 +1773,12 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
     Do normalization before pass DataFrame here 
     outliersFraction=0.05,  # precentage of outliers
     """
-    plotName = f'Loading plot {analysisType} - {title}'
+    ha = calHash(df, cols, note, ntop,
+                 figsize, title, colourSet, rotation,
+                 sciLabel, drawOutliers, outlierDimension,
+                 outlierAlg, outliersFraction, square,
+                 analysisType, plsClasses)
+    plotName = f'{analysisType}_loading_{title}{ha}'
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
 
@@ -1739,14 +1803,12 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
         raise ValueError("Do not know result type, make sure 'ImputationPercentage' or 'baseMean' in input data columns")
 
     directory = f'Plots/{analysisType}/'
-    name = f'{analysisType}_{title}'
-    if not os.path.isdir(directory):
-        os.makedirs(directory)
-    name += ('_' if title != '' else '')
-    name += 'loading_'
+    name = f'{analysisType}_loading_{title}'
+    os.makedirs(directory, exist_ok=True)
     name += "_".join(cols[:min(len(cols), 2)])
     if len(cols) > 2:
         name += '...'
+    name += ha
     filePath = os.path.join(directory, name)
 
     dfPlot = dfComp.loc[:, ["PC1", "PC2"]]
@@ -1891,7 +1953,10 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
                  outlierAlg=3, outliersFraction=0.05, square=True,
                  title=None, tClass=0, drawOutliers=True, figsize=(6, 5)):
     """ Do normalization before pass DataFrame here """
-    plotName = f'PLS V plot - {title}'
+    ha = calHash(df, ntop, classes, cols, n_components,
+                 outlierAlg, outliersFraction, square,
+                 title, tClass, drawOutliers, figsize)
+    plotName = f'PLS_Vplot_{title}{ha}'
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
 
@@ -1913,12 +1978,12 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
 
     directory = f'Plots/PLS/'
     name = f'PLS_Vplot_{title}'
-    if not os.path.isdir(directory):
-        os.makedirs(directory)
+    os.makedirs(directory, exist_ok=True)
     name += ('_' if title != '' else '')
     name += "_".join(cols[:min(len(cols), 2)])
     if len(cols) > 2:
         name += '...'
+    name += ha
     filePath = os.path.join(directory, name)
 
     # Size set in scatter plot is the suface of the point
@@ -2036,9 +2101,10 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
 # )
 
     """
-    plotName = f'Volcano plot - {title}'
-    logger.info(f'Plotting {plotName}')
-    plt.close(plotName)
+    ha = calHash(compDf, quantSeries, figsize,
+                square, lfcThresh, pThresh,
+                xmax, ymax,
+                title)
     colFc = 'log2FC'
     colPv = 'adj.pvalue'
     if 'ImputationPercentage' in compDf.columns:
@@ -2047,14 +2113,13 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
         prog = 'DESeq2'
     else:
         raise ValueError("Do not know result type, make sure 'ImputationPercentage' or 'baseMean' in input data columns")
+    plotName = f'Volcano_{prog}_{title}{ha}'
+    logger.info(f'Plotting {plotName}')
+    plt.close(plotName)
 
     directory = f'Plots/Volcano/'
-    if not os.path.isdir(directory):
-        os.makedirs(directory)
-    name = f'volcano_{prog}_{title}'
-    filePath = os.path.join(directory, name)
-    timeStr = datetime.now().strftime("%Y%m%d%H%M%S")
-    filePath += (timeStr if filePath[-1] in ['_', '/'] or os.path.isdir(filePath) else f'_{timeStr}')
+    os.makedirs(directory, exist_ok=True)
+    filePath = os.path.join(directory, plotName)
 
     # clean up data
     compDf = compDf[~compDf[colFc].isna()]
@@ -2165,7 +2230,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     if square:
         square_subplots(fig, ax)
 
-    ax.set_title(name)
+    ax.set_title(plotName)
 
     fig.savefig(f'{filePath}.svg')
     vFilledDf = pd.concat([log2fc, procPval], axis=1)
@@ -2188,7 +2253,9 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
              ['WT_20',   'WT_24',   'WT_26',   'WT_45'  ]]
     plotType in ['bar', 'line fill', 'line bar'], to be added: 'line 2D', "bar 2D"
     """
-    plotName = f'query - {title} - {ids}'
+    ha = calHash(meanDf, barDf, ids, conditions, figsize, title, ylims, xs,
+          plotType, queryConditionGroupNames, xlabels, xlabelRotation)
+    plotName = f'query_{plotType}_{title}_{ids}{ha}'
     logger.info(f'Query with name: {plotName}')
     plt.close(plotName)
     # Normalise meanDf,
@@ -2296,4 +2363,7 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
     for l in ax.get_xticklabels():
         l.set_rotation(xlabelRotation)
     plt.tight_layout()
+    savedir = 'Plots/query'
+    os.makedirs(savedir, exist_ok=True)
+    fig.savefig(os.path.join(savedir, plotName+'.svg'))
     plt.show()
