@@ -1490,7 +1490,10 @@ def plotCorr(df, cols=None, method='pearson', fontsize=6, figsize=(6, 5),
     else:
         cols = df.columns
     corrDf = df.corr(method=method)
-    plotName = f'Correlation plot {ha}'
+    plotName = 'Correlation_'
+    for c in cols[:2]:
+        plotName+=f"_{c}"
+    plotName += ha
     plt.close(plotName)
     fig, ax = plt.subplots(1, 1, figsize=figsize, num=plotName)
     pcm = ax.pcolormesh(corrDf, vmin=vmin, vmax=vmax, cmap=colormap)
@@ -1503,12 +1506,21 @@ def plotCorr(df, cols=None, method='pearson', fontsize=6, figsize=(6, 5),
     ax.set_ylim(ax.get_ylim()[::-1])
     ax.set_title('Correlation Matrix')
     fig.colorbar(pcm, ax=ax)
+    plt.tight_layout()
     saveDir = 'Plots/Correlation'
     os.makedirs(saveDir, exist_ok=True)
-    savePath = os.path.join(saveDir, plotName+'.svg')
-    fig.savefig(savePath)
-    logger.info(f'Correlation plot saved to {savePath}.')
-    plt.tight_layout()
+    figFile = os.path.join(saveDir, plotName+'.svg')
+    tabFile = os.path.join(saveDir, plotName+'.xlsx')
+    if os.path.isfile(figFile):
+        logger.log(f'Correlation plot exists: {figFile}')
+    else:
+        logger.log(f'Save correlation plot at {figFile}')
+        fig.savefig(figFile)
+    if os.path.isfile(tabFile):
+        logger.log(f'Correlation data exists: {tabFile}')
+    else:
+        logger.info(f'Save correlation data at {tabFile}')
+        corrDf.to_excel(tabFile)
     plt.show()
 
 
@@ -1708,16 +1720,25 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
     fig.canvas.mpl_connect("motion_notify_event", hover)
     if square:
         square_subplots(fig, ax)
-    logger.info(f'PCA plot generated with path {filePath}\n')
-    fig.savefig(f'{filePath}.svg')
-    paDf.to_excel(f'{filePath}.xlsx')
+    figFile = filePath+'.svg'
+    tabFile = filePath+'.xlsx'
+    if os.path.isfile(figFile):
+        logger.info(f'PCA plot exists at {figFile}')
+    else:
+        logger.info(f'Save PCA plot at {figFile}')
+        fig.savefig(figFile)
+    if os.path.isfile(tabFile):
+        logger.info(f'PCA data exists at {tabFile}')
+    else:
+        logger.info(f'Save PCA data at {tabFile}')
+        paDf.to_excel(f'{filePath}.xlsx')
     plt.show()
     return PaClass
 
 
 def plotPCAExplaination(PcaClass, title=""):
     ha = calHash(PcaClass, title)
-    plotName = f'PCA_explaination_{title}{ha}'
+    plotName = f'PCA_explaination_{title}_{ha}'
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
     explainedRatios = PcaClass.explained_variance_ratio_
@@ -1738,7 +1759,19 @@ def plotPCAExplaination(PcaClass, title=""):
     )
     saveDir = 'Plots/PCA'
     os.makedirs(saveDir, exist_ok=True)
-    fig.savefig(os.path.join(saveDir, plotName))
+    figFile = os.path.join(saveDir, plotName+".svg")
+    tabFile = os.path.join(saveDir, plotName+".xlsx")
+    if os.path.isfile(figFile):
+        logger.info(f'PCA explanation plot exists: {figFile}')
+    else:
+        logger.info(f'Save PCA explanation plot at {figFile}')
+        fig.savefig(figFile)
+    if os.path.isfile(tabFile):
+        logger.info(f'PCA explanation data exists: {tabFile}')
+    else:
+        logger.info(f'Save PCA explanation data at {tabFile}')
+        pd.DataFrame(PcaClass.explained_variance_ratio_).to_excel(tabFile)
+    
     plt.show()
 
 
@@ -1778,7 +1811,7 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
                  sciLabel, drawOutliers, outlierDimension,
                  outlierAlg, outliersFraction, square,
                  analysisType, plsClasses)
-    plotName = f'{analysisType}_loading_{title}{ha}'
+    plotName = f'{analysisType}_loading_{title}_{ha}'
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
 
@@ -1924,8 +1957,18 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
     if square:
         square_subplots(fig, ax)
 
-    fig.savefig(f'{filePath}.svg')
-    dfPlot.to_excel(f'{filePath}.xlsx')
+    figFile = f'{filePath}.svg'
+    tabFile = f'{filePath}.xlsx'
+    if os.path.isfile(figFile):
+        logger.info(f'{analysisType} loading plot exists: {figFile}')
+    else:
+        logger.info(f'Save {analysisType} loading plot at {figFile}')
+        fig.savefig(figFile)
+    if os.path.isfile(tabFile):
+        logger.info(f'{analysisType} loading plot data exists: {tabFile}')
+    else:
+        logger.info(f'Save {analysisType} loading plot data at {tabFile}')
+        dfPlot.to_excel(tabFile)
 
     plt.show()
 
@@ -1956,7 +1999,7 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
     ha = calHash(df, ntop, classes, cols, n_components,
                  outlierAlg, outliersFraction, square,
                  title, tClass, drawOutliers, figsize)
-    plotName = f'PLS_Vplot_{title}{ha}'
+    plotName = f'PLS_Vplot_{title}_{ha}'
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
 
@@ -2074,8 +2117,20 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
     ax.set_title(title, fontsize=12)
     if square:
         square_subplots(fig, ax)
-    fig.savefig(f'{filePath}.svg')
-    dfPlot.to_excel(f'{filePath}.xlsx')
+
+    figFile = f'{filePath}.svg'
+    tabFile = f'{filePath}.xlsx'
+    if os.path.isfile(figFile):
+        logger.info(f'V plot figure exists: {figFile}')
+    else:
+        logger.info(f'Save V plot at {figFile}')
+        fig.savefig(figFile)
+    if os.path.isfile(tabFile):
+        logger.info(f'V plot data exists: {tabFile}')
+    else:
+        logger.info(f'Save V plot data at {tabFile}')
+        dfPlot.to_excel(tabFile)
+
     plt.show()
 
 # plotPlsVplot(vstDf, classes=plsClasses, title='VST')
@@ -2113,7 +2168,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
         prog = 'DESeq2'
     else:
         raise ValueError("Do not know result type, make sure 'ImputationPercentage' or 'baseMean' in input data columns")
-    plotName = f'Volcano_{prog}_{title}{ha}'
+    plotName = f'Volcano_{prog}_{title}_{ha}'
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
 
@@ -2232,11 +2287,24 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
 
     ax.set_title(plotName)
 
-    fig.savefig(f'{filePath}.svg')
-    vFilledDf = pd.concat([log2fc, procPval], axis=1)
-    vFilledDf.columns = [c+'_filled' for c in vFilledDf.columns]
-    vFilledDf.to_excel(f'{filePath}_filled.xlsx')
-    vDf.to_excel(f'{filePath}.xlsx')
+    figFile = filePath+'.svg'
+    tabFile = filePath+'.xlsx'
+    tabFilledFile = filePath+"_filled.xlsx"
+    if os.path.isfile(figFile):
+        logger.info(f'Figure file exists: {figFile}')
+    else:
+        logger.info(f'Save volcano figure at {figFile}')
+        fig.savefig(figFile)
+    if os.path.isfile(tabFile):
+        logger.info(f'Table file exists: {tabFile}')
+    else:
+        logger.info(f'Save volcano original data at {tabFile}')
+        logger.info(f'Save volcano plot data at {tabFilledFile}')
+        vFilledDf = pd.concat([log2fc, procPval], axis=1)
+        vFilledDf.columns = [c+'_filled' for c in vFilledDf.columns]
+        vFilledDf.to_excel(tabFilledFile)
+        vDf.to_excel(tabFile)
+    plt.show()
 
 
 # Query subset
@@ -2255,7 +2323,7 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
     """
     ha = calHash(meanDf, barDf, ids, conditions, figsize, title, ylims, xs,
           plotType, queryConditionGroupNames, xlabels, xlabelRotation)
-    plotName = f'query_{plotType}_{title}_{ids}{ha}'
+    plotName = f'query_{plotType}_{title}_{ids}_{ha}'
     logger.info(f'Query with name: {plotName}')
     plt.close(plotName)
     # Normalise meanDf,
@@ -2365,5 +2433,20 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
     plt.tight_layout()
     savedir = 'Plots/query'
     os.makedirs(savedir, exist_ok=True)
-    fig.savefig(os.path.join(savedir, plotName+'.svg'))
+    figFile = os.path.join(savedir, plotName+'.svg')
+    tabFile = os.path.join(savedir, plotName+'.xlsx')
+
+    if os.path.isfile(figFile):
+        logger.info(f'Figure file exists: {figFile}')
+    else:
+        logger.info(f'Save query figure at {figFile}')
+        fig.savefig(figFile)
+    if os.path.isfile(tabFile):
+        logger.info(f'Table file exists: {tabFile}')
+    else:
+        logger.info(f'Save query table at {figFile}')
+        saveBarDf = barDf
+        saveBarDf.columns = [c+'_bar' for c in barDf.columns]
+        pd.concat((meanDf, saveBarDf), axis=1).to_excel(tabFile)
+    
     plt.show()
