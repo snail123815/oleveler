@@ -1736,7 +1736,7 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
     return PaClass
 
 
-def plotPCAExplaination(PcaClass, title=""):
+def plotPCAExplanation(PcaClass, title=""):
     ha = calHash(PcaClass, title)
     plotName = f'PCA_explaination_{title}_{ha}'
     logger.info(f'Plotting {plotName}')
@@ -1841,7 +1841,7 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
     name += "_".join(cols[:min(len(cols), 2)])
     if len(cols) > 2:
         name += '...'
-    name += ha
+    name += f'_{ha}'
     filePath = os.path.join(directory, name)
 
     dfPlot = dfComp.loc[:, ["PC1", "PC2"]]
