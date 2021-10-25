@@ -855,10 +855,13 @@ def processMSstats(mqDataPath, annotationPath):
 
     # Calculate quantitation table
     if os.path.isfile(proposedDataPath):
+        logger.info('Read proposed data from table')
+        logger.info(proposedDataPath)
         quantTable = pd.read_csv(proposedDataPath, sep='\t')
     else:
         prepareMSstats(mqDataPath, annotationPath)
         logger.info('Write proposed data to table')
+        logger.info(proposedDataPath)
         proposedDataPath = proposedDataPath.replace('\\', '\\\\')
         logger.info(proposedDataPath)
         robjects.r(
@@ -891,6 +894,7 @@ def processMSstats(mqDataPath, annotationPath):
     # Convert the quantification data from MSstats to a expression table
     if os.path.isfile(logDataPath):
         logger.info(f'Read MSstats proposed expression table')
+        logger.info(logDataPath)
         logDf = pd.read_csv(logDataPath, sep='\t', index_col=0)
     else:
         logger.info('Transform MSstats proposed data into data table')
