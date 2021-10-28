@@ -6,6 +6,19 @@
 # durand[dot]dc[at]hot[no space]mail.com
 ############################################
 
+olevelerVersion = 1.0
+infoText = f'''
+Oleveler - omics data analysis tools for jupyter notebook
+
+Version {olevelerVersion}
+---
+by Chao DU
+Institute of Biology Leiden, Leiden University, the Netherlands
+c.du@biology.leidenuniv.nl
+durand[dot]dc[at]hot[no space]mail.com
+---
+
+'''
 
 import os
 import pickle
@@ -61,6 +74,9 @@ if len(logger.handlers) == 0:
     logger.addHandler(logfhandler)
     logger.addHandler(logshandler)
     logger.setLevel(logging.DEBUG)
+
+logger.info(infoText)
+
 
 def writeRSessionInfo(fileName, overwrite=True, logger=None):
     
