@@ -122,7 +122,7 @@ def loadMQLfqData(dataPath, minLfq=3):
         # infer data type of each column.
         low_memory=False
     )
-    ha = md5(proteinGroupsDf.to_json().encode()).hexdigest()[:6]
+    ha = calHash(proteinGroupFilePath, minLfq)
 
     lfqTableOut = os.path.join(
         dataTablesPath,
@@ -528,9 +528,12 @@ def calculateTPM(countTableDf, infoFiles,
     Returns:
         pd.DataFrame: TPM calculated
     """
-    paraHash = md5(countTableDf.to_json().encode()).hexdigest()[:6]
+    ha = calHash(countTableDf, infoFiles,
+                 tagsForGeneName,
+                 lengthColParsingKeys, typeCol,
+                 removerRNA, removeIDsubstrings, removeIDcontains)
     os.makedirs('dataTables', exist_ok=True)
-    tpmTablePath = f'dataTables/TPM_Table_{paraHash}.tsv'
+    tpmTablePath = f'dataTables/TPM_Table_{ha}.tsv'
     if os.path.isfile(tpmTablePath):
         tpmDf = pd.read_csv(tpmTablePath, sep='\t', index_col=0)
         logger.info(f'TPM data read from {tpmTablePath}.')
@@ -605,16 +608,13 @@ def getStats(dataDf, experiments):
     If you want to exclude any data, do that before passing data in here.
     """
     # calculate hash for parameters
-    hastr = md5(dataDf.to_json().encode()).digest()
-    hastr += ''.join(experiments.keys()).encode()
-    hastr += ''.join(''.join(experiments[k]) for k in experiments).encode()
-    tbHash = md5(hastr).hexdigest()[:6]
+    ha = calHash(dataDf, experiments)
 
-    meanTbFile = f'dataTables/mean_{tbHash}.tsv'
-    nquantTbFile = f'dataTables/nquant_{tbHash}.tsv'
-    varTbFile = f'dataTables/var_{tbHash}.tsv'
-    stdTbFile = f'dataTables/std_{tbHash}.tsv'
-    semTbFile = f'dataTables/sem_{tbHash}.tsv'
+    meanTbFile = f'dataTables/mean_{ha}.tsv'
+    nquantTbFile = f'dataTables/nquant_{ha}.tsv'
+    varTbFile = f'dataTables/var_{ha}.tsv'
+    stdTbFile = f'dataTables/std_{ha}.tsv'
+    semTbFile = f'dataTables/sem_{ha}.tsv'
 
     outputFiles = [meanTbFile, nquantTbFile, varTbFile, stdTbFile, semTbFile]
 
@@ -701,12 +701,7 @@ def deseq2Process(
     dataDf = dataDf.loc[:, newCol]
 
     # Calculate hash
-    hastr = md5(dataDf.to_json().encode()).digest()  # large dataset can be digested to save memory
-    hastr += md5(metaDf.to_json().encode()).digest()
-    hastr += str(ref).encode()
-    hastr += str(deOnly).encode()
-    hastr += str(designCol).encode()
-    ha = md5(hastr).hexdigest()[:6]
+    ha = calHash(dataDf, metaDf, ref, deOnly, designCol)
 
     logger.info(f'Current deseq2Process parameter hash = {ha}')
 
@@ -865,14 +860,7 @@ def processMSstats(mqDataPath, annotationPath):
     # calculate Hash
     pgPath = os.path.join(mqDataPath, "proteinGroups.txt")
     evPath = os.path.join(mqDataPath, 'evidence.txt')
-    with open(pgPath, 'rb') as f:
-        hastr = md5(f.read()).digest()
-    with open(evPath, 'rb') as f:
-        hastr += md5(f.read()).digest()
-    with open(annotationPath, 'rb') as f:
-        hastr += md5(f.read()).digest()
-    ha = md5(hastr).hexdigest()[:6]
-    # haFile.close()
+    ha = calHash(pgPath, evPath, annotationPath)
 
     qcplotPath = f'dataTables/transformed/msstats_proposed_{ha}_QCPlot.pdf'
     proposedDataPath = f'dataTables/transformed/msstats_proposed_{ha}.tsv'
@@ -1448,56 +1436,64 @@ def _rotateAxis(alpha, df):
     return rotated
 
 
-def orderDict(di):
-    try:
-        d = di.copy()
-    except:
-        d = di
-    if isinstance(d, dict):
-        od = OrderedDict(sorted(d.items()))
-        for k, v in od.items():
-            v = orderDict(v)
-            od[str(k)] = v
-        d = od
-    elif isinstance(d, (list, tuple, set)):
-        d = [orderDict(el) for el in d]
-    else:
-        d = str(d).strip()
-    return d
-
-
-def hashDict(di):
-    od = orderDict(di)
-    ha = md5(
-        json.dumps(
-            od,
-            sort_keys=True,
-            ensure_ascii=True,
-            default=str
-        ).encode()
-    ).digest()
-    return ha
-
-
-def calHash(*args):
-    # not safe with nested objects
-    hastr = ''.encode()
-    for arg in args:
-        if isinstance(arg, pd.core.frame.DataFrame) or isinstance(arg, pd.core.series.Series):
-            hastr += md5(arg.to_json().encode()).digest()
-        elif isinstance(arg, str):
-            hastr += arg.encode()
-        elif isinstance(arg, set):
-            hastr += str(sorted(list())).encode()
-        elif isinstance(arg, dict):
-            hastr += hashDict(arg)
-        elif isinstance(arg, PCA):
-            hastr += arg.components_.tobytes()
-        elif isinstance(arg, PLS):
-            hastr += arg.x_loadings_.tobytes()
+def calHash(*args) -> str:
+    """Produce 6 digit string with unlimited number of arguments passed in
+    Designed in mind that all types of data can be calculated
+    resulting the same hash across platform.
+    Should be safe with nested dict but no guarantee
+    """
+    def orderDict(di):
+        try:
+            d = di.copy()
+        except:
+            d = di
+        if isinstance(d, dict):
+            od = OrderedDict(sorted(d.items()))
+            for k, v in od.items():
+                v = orderDict(v)
+                od[str(k)] = v
+            d = od
+        elif isinstance(d, (list, tuple, set)):
+            d = [orderDict(el) for el in d]
         else:
-            hastr += str(arg).encode()
-    return md5(hastr).hexdigest()[:6]
+            d = str(d).strip()
+        return d
+
+    def hashDict(di):
+        od = orderDict(di)
+        ha = md5(
+            json.dumps(
+                od,
+                sort_keys=True,
+                ensure_ascii=True,
+                default=str
+            ).encode()
+        ).digest()
+        return ha
+
+    haRaw = ''.encode()
+    for arg in args:
+        if isinstance(arg, str):
+            if os.path.isfile(os.path.realpath(arg)):
+                # Less dangerous if transformed to real path.
+                # Do not think about making a dir recognisable.
+                with open(arg, 'rb') as f:
+                    haRaw += md5(f.read()).digest()
+            else:
+                haRaw += arg.encode()
+        elif isinstance(arg, set):
+            haRaw += str(sorted(list())).encode()
+        elif isinstance(arg, dict):
+            haRaw += hashDict(arg)
+        elif isinstance(arg, pd.core.frame.DataFrame) or isinstance(arg, pd.core.series.Series):
+            haRaw += md5(arg.to_json().encode()).digest()
+        elif isinstance(arg, PCA):
+            haRaw += arg.components_.tobytes()
+        elif isinstance(arg, PLS):
+            haRaw += arg.x_loadings_.tobytes()
+        else:
+            haRaw += str(arg).encode()
+    return md5(haRaw).hexdigest()[:6]
 
 
 def plotCorr(df, cols=None, method='pearson', fontsize=6, figsize=(6, 5),
