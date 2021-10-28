@@ -72,12 +72,16 @@ def writeRSessionInfo(fileName, overwrite=True, logger=None):
 
     if isinstance(logger, type(None)):
         logger = logging.getLogger()
-    sinfo = 'Attached packages in current R session:\n' + '=' * 80 + '\n'
-    for l in robjects.r('sessionInfo()["otherPkgs"]')[0]:
-        x = printToString(l).split('\n')
-        y = [a for a in x if len(a)>0 and not a.startswith('-- File:')]
-        z = '\n'.join(y) + '\n\n' + "=" * 80 + '\n'
-        sinfo += z
+    try:
+        sinfo = 'Attached packages in current R session:\n' + '=' * 80 + '\n'
+        for l in robjects.r('sessionInfo()["otherPkgs"]')[0]:
+            x = printToString(l).split('\n')
+            y = [a for a in x if len(a)>0 and not a.startswith('-- File:')]
+            z = '\n'.join(y) + '\n\n' + "=" * 80 + '\n'
+            sinfo += z
+    except TypeError:
+        logger.info('No R packages loaded in current session')
+        return 0
     logger.info(sinfo)
     if not overwrite:
         if os.path.isfile(fileName):
