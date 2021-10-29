@@ -618,19 +618,19 @@ def removeIds(dataDf, toRemove):
     return newDf
 
 
-def getStats(dataDf, experiments):
+def getStats(dataDf, experiments, title=''):
     """
     Usage: meanDf, nquantDf, varDf, stdDf, semDf = getStats(lfqDf, experiments)
     If you want to exclude any data, do that before passing data in here.
     """
     # calculate hash for parameters
-    ha = calHash(dataDf, experiments)
+    ha = calHash(dataDf, experiments) # skipping title for now
 
-    meanTbFile = f'dataTables/mean_{ha}.tsv'
-    nquantTbFile = f'dataTables/nquant_{ha}.tsv'
-    varTbFile = f'dataTables/var_{ha}.tsv'
-    stdTbFile = f'dataTables/std_{ha}.tsv'
-    semTbFile = f'dataTables/sem_{ha}.tsv'
+    meanTbFile = f'dataTables/mean_{title}_{ha}.tsv'
+    nquantTbFile = f'dataTables/nquant_{title}_{ha}.tsv'
+    varTbFile = f'dataTables/var_{title}_{ha}.tsv'
+    stdTbFile = f'dataTables/std_{title}_{ha}.tsv'
+    semTbFile = f'dataTables/sem_{title}_{ha}.tsv'
 
     outputFiles = [meanTbFile, nquantTbFile, varTbFile, stdTbFile, semTbFile]
 
