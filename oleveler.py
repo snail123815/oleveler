@@ -50,6 +50,10 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.lines import Line2D
 import matplotlib.ticker as mtick
+from matplotlib.patches import Patch
+import matplotlib.gridspec as gridspec
+
+import seaborn as sns
 
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
 from sklearn.decomposition import PCA
@@ -58,6 +62,8 @@ from sklearn.ensemble import IsolationForest
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.svm import OneClassSVM
 from sklearn.covariance import EllipticEnvelope
+
+from scipy.cluster.hierarchy import fcluster
 
 logger = logging.getLogger()
 logging.getLogger('matplotlib.font_manager').disabled = True
@@ -2367,6 +2373,114 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
         vFilledDf.to_excel(tabFilledFile)
         vDf.to_excel(tabFile)
     plt.show()
+
+
+def plotHeatmapGetCluster(
+    df, index=None, cols=None, nCluster=4, ylabels=None, xlabels='ALL', title='',
+    plot=True, saveFig=False
+):
+    """[summary]
+
+    Args:
+        plotDf ([type]): [description]
+        index ([type], optional): [description]. Defaults to None.
+        cols ([type], optional): [description]. Defaults to None.
+        nCluster (int, optional): [description]. Defaults to 4.
+        ylabels ([type], optional): [description]. Defaults to None.
+        xlabels (str, optional): [description]. Defaults to 'ALL'.
+        title (str, optional): [description]. Defaults to ''.
+        plot (bool, optional): [description]. Defaults to True.
+        saveFig (bool, optional): [description]. Defaults to False.
+
+    Returns:
+        [type]: [description]
+    """
+    # Filter data, order columns
+    if isinstance(index, type(None)):
+        index = df.index
+    if isinstance(cols, type(None)):
+        cols = df.columns
+    plotDf = df.loc[index,cols]
+    # hash para
+    ha = calHash(plotDf, index, cols, nCluster, ylabels, xlabels, title)
+
+    fname = f'Heatmap_{title}_{ha}'
+    plt.close(fname)
+    # plot to get cluster info only
+    cg = sns.clustermap(plotDf, method='ward',standard_scale=0, col_cluster=False)
+    cg.fig.set_label(fname)
+    plt.close(fname)
+    cluster = pd.Series(fcluster(cg.dendrogram_row.linkage, nCluster, criterion='maxclust'),
+                        index = plotDf.index, name='cluster')
+
+    # Assign cluster colours
+    lut = dict(zip(cluster.unique(), plt.get_cmap('tab10')(cluster.unique())))
+    cg = sns.clustermap(plotDf, method='ward',standard_scale=0, col_cluster=False,
+                        row_colors=cluster.map(lut))
+    cg.fig.suptitle(fname)
+    cLegends = []
+    for l in sorted(list(lut.keys())):
+        cLegends.append(Patch(facecolor=lut[l], edgecolor=None, label=f'Cluster {l}'))
+    cg.fig.set_label(fname)
+    cg.fig.legend(handles=cLegends,loc=3)
+    newgs = gridspec.GridSpec(ncols=5, nrows=3, top=0.95,
+                              width_ratios=[0.15, 0.02, 0.68, 0.12, 0.03],
+                              height_ratios=[0.3,0.2,0.5],
+                              figure=cg.fig)
+    cg.ax_row_dendrogram.set_subplotspec(newgs[:,0])
+    cg.ax_row_colors.set_subplotspec(newgs[:,1])
+    cg.ax_heatmap.set_subplotspec(newgs[:,2])
+    cg.cax.set_subplotspec(newgs[1,4])
+    # Transformed data
+    data2d = cg.data2d
+    # Set x and y tick labels
+    if isinstance(ylabels, type(None)):
+        cg.ax_heatmap.set_yticklabels([])
+        cg.ax_heatmap.set_yticks([])
+        cg.ax_heatmap.set_ylabel('')
+    elif ylabels == 'AUTO':
+        pass
+    else:
+        if ylabels == 'ALL':
+            ylabels = data2d.index
+        assert len(ylabels) == data2d.shape[0], f'ylabels needs to have {data2d.shape[0]} elements'
+        cg.ax_heatmap.set_yticks(np.linspace(0.5, data2d.shape[0]-0.5, data2d.shape[0]))
+        cg.ax_heatmap.set_yticklabels(ylabels)
+    if isinstance(xlabels, type(None)):
+        cg.ax_heatmap.set_xticklabels([])
+        cg.ax_heatmap.set_xticks([])
+        cg.ax_heatmap.set_xlabel('')
+    elif xlabels == 'AUTO':
+        pass
+    else:
+        if xlabels == 'ALL':
+            xlabels = data2d.columns 
+        assert len(xlabels) == data2d.shape[1], f'xlabels needs to have {data2d.shape[1]} elements'
+        cg.ax_heatmap.set_xticks(np.linspace(0.5, data2d.shape[1]-0.5, data2d.shape[1]))
+        cg.ax_heatmap.set_xticklabels(xlabels)
+    
+    # Output data
+    cluster = pd.concat((data2d, cluster), axis=1)
+    # Save figure and data
+    if plot and saveFig:
+        figPath='Plots/Clustermap'
+        figFile=os.path.join(figPath, fname+'.svg')
+        tabFile=os.path.join(figPath, fname+'.xlsx')
+        os.makedirs(figPath, exist_ok=True)
+        if os.path.isfile(figFile):
+            logger.info(f'Cluster plot exists: {figFile}')
+        else:
+            logger.info(f'Save cluster plot at {figFile}')
+            cg.savefig(figFile)
+        if os.path.isfile(tabFile):
+            logger.info(f'Save cluster data at {tabFile}')
+        else:
+            cluster.to_excel(tabFile)
+    elif plot:
+        plt.show()
+    else:
+        plt.close(fname)
+    return cluster
 
 
 # Query subset
