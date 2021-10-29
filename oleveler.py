@@ -2480,7 +2480,7 @@ def plotHeatmapGetCluster(
         plt.show()
     else:
         plt.close(fname)
-    return cluster
+    return cluster, fname
 
 
 # Query subset
