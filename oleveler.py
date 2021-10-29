@@ -1323,6 +1323,25 @@ def makeCompMatrixDeseq2(compExcel, countTable, annotationPath, shrink=None):
     return allCompResults, comparisons
 
 
+def getSig(compDf, tFc=1.5, tPv=0.05):
+    """return compDf with only significant ids
+
+    Note if you need significant ids in only one experiment, do not pass whole compDf
+
+    Args:
+        compDf ([type]): [description]
+        tFc (float, optional): [description]. Defaults to 1.5.
+        tPv (float, optional): [description]. Defaults to 0.05.
+
+    Returns:
+        compDf: filtered
+    """
+    f = compDf['log2FC'] > np.log2(tFc)
+    f = f | (compDf['log2FC'] < -np.log2(tFc))
+    f = f & (compDf['adj.pvalue'] < tPv)
+    return compDf[f]
+
+
 def square_subplots(fig, axs):
     """Make a figure square"""
     try:
