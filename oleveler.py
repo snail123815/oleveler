@@ -632,11 +632,11 @@ def getStats(dataDf, experiments, title=''):
     # calculate hash for parameters
     ha = calHash(dataDf, experiments) # skipping title for now
 
-    meanTbFile = f'dataTables/mean_{title}_{ha}.tsv'
-    nquantTbFile = f'dataTables/nquant_{title}_{ha}.tsv'
-    varTbFile = f'dataTables/var_{title}_{ha}.tsv'
-    stdTbFile = f'dataTables/std_{title}_{ha}.tsv'
-    semTbFile = f'dataTables/sem_{title}_{ha}.tsv'
+    meanTbFile = f'dataTables/mean_{title}_{ha}.tsv'.replace('__', '_')
+    nquantTbFile = f'dataTables/nquant_{title}_{ha}.tsv'.replace('__', '_')
+    varTbFile = f'dataTables/var_{title}_{ha}.tsv'.replace('__', '_')
+    stdTbFile = f'dataTables/std_{title}_{ha}.tsv'.replace('__', '_')
+    semTbFile = f'dataTables/sem_{title}_{ha}.tsv'.replace('__', '_')
 
     outputFiles = [meanTbFile, nquantTbFile, varTbFile, stdTbFile, semTbFile]
 
