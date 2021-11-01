@@ -1694,7 +1694,7 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
                  analysisType, plsClasses, square)
     plotName = f'{analysisType} plot - {title}_{ha}'
     while '__' in plotName:
-        plotName.replace('__', '_')
+        plotName = plotName.replace('__', '_')
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
     if cols != None:
@@ -1827,7 +1827,7 @@ def plotPCAExplanation(PcaClass, title=""):
     ha = calHash(PcaClass, title)
     plotName = f'PCA_explaination_{title}_{ha}'
     while '__' in plotName:
-        plotName.replace('__', '_')
+        plotName = plotName.replace('__', '_')
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
     explainedRatios = PcaClass.explained_variance_ratio_
@@ -1902,7 +1902,7 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
                  analysisType, plsClasses)
     plotName = f'{analysisType}_loading_{title}_{ha}'
     while '__' in plotName:
-        plotName.replace('__', '_')
+        plotName = plotName.replace('__', '_')
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
 
@@ -2092,7 +2092,7 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
                  title, tClass, drawOutliers, figsize)
     plotName = f'PLS_Vplot_{title}_{ha}'
     while '__' in plotName:
-        plotName.replace('__', '_')
+        plotName = plotName.replace('__', '_')
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
 
@@ -2263,7 +2263,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
         raise ValueError("Do not know result type, make sure 'ImputationPercentage' or 'baseMean' in input data columns")
     fname = f'Volcano_{prog}_{title}_{ha}'
     while '__' in fname:
-        fname.replace('__', '_')
+        fname = fname.replace('__', '_')
     logger.info(f'Plotting {fname}')
     plt.close(fname)
 
@@ -2441,7 +2441,7 @@ def plotHeatmapGetCluster(
 
     fname = f'Heatmap_{title}_{ha}'
     while '__' in fname:
-        fname.replace('__', '_')
+        fname = fname.replace('__', '_')
     plt.close(fname)
     # plot to get cluster info only
     cg = sns.clustermap(plotDf, method=method,
@@ -2554,7 +2554,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,
     clusters.sort(key=lambda x: cNitems[x], reverse=True)
     fname = fname + "_" + 'cluster_' + '_'.join([str(c) for c in clusters]) + '_' + ha
     while '__' in fname:
-        fname.replace('__', '_')
+        fname = fname.replace('__', '_')
     plt.close(fname)
     if isinstance(dataDf, type(None)):
         dataDf = clusterDf.loc[:, [c for c in clusterDf.columns if c != 'cluster']]
@@ -2640,7 +2640,7 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
         ids = [ids]
     fname = f'query_{plotType}_{title}_{"_".join([i for i in ids[:2]])}_{ha}'
     while '__' in fname:
-        fname.replace('__', '_')
+        fname = fname.replace('__', '_')
     logger.info(f'Query with name: {fname}')
     plt.close(fname)
     # Normalise meanDf,
