@@ -2598,8 +2598,8 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,
         if len(dataLabels) == 0:
             dataLabels = ['data']
             
-            
-    for ax, c in zip(axs.flatten(), clusters):
+    plotted = dict(map(lambda x: [x, 0], axs.ravel()))
+    for ax, c in zip(axs.ravel(), clusters):
         index = clusterDf[clusterDf['cluster']==c].index
         plotDf = dataDf.loc[index, :]
         aDf = plotDf[conditions[0]]
@@ -2611,9 +2611,27 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,
             pass
         ax.legend()
         ax.annotate(f'cluster {c}, n={len(index)}',(0,1.02), xycoords='axes fraction')
+        plotted[ax] = 1
             
+    if axs.ndim == 2:
+        for a, axss in enumerate(reversed(axs)):
+            for b, ax in enumerate(reversed(axss)):
+                if plotted[ax] == 0:
+                    ax.set_axis_off()
+                    axs[-2-a][-1-b].xaxis.set_tick_params(which='both', labelbottom=True)
+                else:
+                    break
+    else:
+        for i, ax in enumerate(reversed(axs)):
+            if plotted[ax] == 0:
+                ax.set_axis_off()
+                axs[-2-i].xaxis.set_tick_params(which='both', labelbottom=True)
+            else:
+                break
+
     for ax in axs.ravel():
         ax.set_xticklabels(xlabels, rotation=xlabelRotation)
+    
     fig.suptitle(fname)
 
     figPath = 'Plots/Clustermap'
