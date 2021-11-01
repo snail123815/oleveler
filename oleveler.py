@@ -2526,7 +2526,7 @@ def plotHeatmapGetCluster(
     return cluster, fname
 
 
-def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.5, samex=False, **kwargs):
+def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.7, samex=False, **kwargs):
     if isinstance(index, type(None)):
         index = plotDf.index
     pDf = plotDf.loc[index, :]
