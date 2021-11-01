@@ -1354,13 +1354,15 @@ def grayout(c, x=1.2):
         newc[i] = min(newc[i] * 1.2, 1)
 
 
-def calPlotShape(n, h=True):
+def calPlotShape(n, longWide='wide'):
     nc = int(np.sqrt(n))
     nr = n//nc + (1 if n%nc>0 else 0)
-    if h:
+    if longWide == 'wide':
         return nr, nc
-    else:
+    elif longWide == 'long':
         return nc, nr
+    else:
+        raise ValueError(f'Long plot or wide plot? Invalid input {longWide}, should be "long" or "wide"')
 
 
 def square_subplots(fig, axs):
@@ -2529,13 +2531,16 @@ def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.5, sam
         ax.plot(pDf.T, alpha=alpha, linewidth=linewidth, color=newc, zorder=1, **kwargs)
         
 
-def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,4], figsize=(10,8),
+def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,4], figsize=(10,8), longWide='wide',
                 xs=None, queryConditionGroupNames=None, dataLabels=[], xlabels=[], xlabelRotation=0):
+    
+    ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide,
+                xs, queryConditionGroupNames, dataLabels, xlabels, xlabelRotation)
     
     clusters = list(set(clusterDf['cluster'].to_list()).intersection(set(clusters)))
     cNitems = dict(map(lambda x: (x, (clusterDf['cluster'] == x).value_counts()[True]), clusters))
     clusters.sort(key=lambda x: cNitems[x], reverse=True)
-    fname = 'cluster_' + '_'.join([str(c) for c in clusters]) + '_' + fname
+    fname = fname + "_" + 'cluster_' + '_'.join([str(c) for c in clusters]) + '_' + ha
     plt.close(fname)
     if isinstance(dataDf, type(None)):
         dataDf = clusterDf.loc[:, [c for c in clusterDf.columns if c != 'cluster']]
@@ -2556,7 +2561,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,
     assert qshape == conditions.shape, f'{qshape}, {conditions.shape}'
     
     nplots = len(clusters)
-    nr, nc = calPlotShape(nplots)
+    nr, nc = calPlotShape(nplots, longWide)
     fig, axs = plt.subplots(nr, nc, num=fname, sharex=True, sharey=True,
                             constrained_layout=True, figsize=figsize)
     
@@ -2588,6 +2593,17 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,
     for ax in axs.ravel():
         ax.set_xticklabels(xlabels, rotation=xlabelRotation)
     fig.suptitle(fname)
+
+    figPath = 'Plots/Clustermap'
+    os.makedirs(figPath, exist_ok=True)
+    figFile = os.path.join(figPath, f'{fname}.svg')
+    if os.path.isfile(figFile):
+        logger.info(f'Cluster expression plot exists: {figFile}')
+    else:
+        logger.info(f'Save cluster expression plot at {figFile}')
+        fig.savefig(figFile)
+    
+    plt.show()
 
 
 # Query subset
