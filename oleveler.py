@@ -2632,7 +2632,8 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
                 break
 
     for ax in axs.ravel():
-        ax.set_xticklabels(xlabels, rotation=xlabelRotation)
+        ax.xaxis.set_ticks(range(len(xlabels)))
+        ax.xaxis.set_ticklabels(xlabels, rotation=xlabelRotation)
     
     fig.suptitle(fname)
 
