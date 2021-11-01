@@ -2551,7 +2551,13 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,
     ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide,
                 xs, queryConditionGroupNames, dataLabels, xlabels, xlabelRotation)
     
-    clusters = list(set(clusterDf['cluster'].to_list()).intersection(set(clusters)))
+    if isinstance(clusters, str):
+        if clusters.lower() == "all":
+            clusters = list(set(clusterDf['cluster'].to_list()))
+        else:
+            raise ValueError(f'clusters needs to be either "all" or list of cluster numbers')
+    else:
+        clusters = list(set(clusterDf['cluster'].to_list()).intersection(set(clusters)))
     cNitems = dict(map(lambda x: (x, (clusterDf['cluster'] == x).value_counts()[True]), clusters))
     clusters.sort(key=lambda x: cNitems[x], reverse=True)
     fname = fname + "_" + 'cluster_' + '_'.join([str(c) for c in clusters]) + '_' + ha
