@@ -26,6 +26,7 @@ import logging
 import sys
 import json
 import io
+from itertools import cycle
 from multiprocessing import Process
 from threading import Thread
 from tempfile import NamedTemporaryFile
@@ -2456,7 +2457,7 @@ def plotHeatmapGetCluster(
                         index = plotDf.index, name='cluster')
 
     # Assign cluster colours
-    lut = dict(zip(cluster.unique(), plt.get_cmap('tab10')(cluster.unique())))
+    lut = dict(zip(cluster.unique(), cycle(plt.get_cmap('tab10')(range(10)))))
     cg = sns.clustermap(plotDf, method=method,
                         standard_scale=standard_scale,
                         col_cluster=False,
