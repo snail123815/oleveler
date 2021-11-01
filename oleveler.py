@@ -1579,6 +1579,8 @@ def plotCorr(df, cols=None, method='pearson', fontsize=6, figsize=(6, 5),
     for c in cols[:2]:
         plotName+=f"_{c}"
     plotName += ha
+    while '__' in plotName:
+        plotName = plotName.replace('__', '_')
     plt.close(plotName)
     fig, ax = plt.subplots(1, 1, figsize=figsize, num=plotName)
     pcm = ax.pcolormesh(corrDf, vmin=vmin, vmax=vmax, cmap=colormap)
