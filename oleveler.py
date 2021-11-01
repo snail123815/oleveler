@@ -2545,7 +2545,7 @@ def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.7, sam
         ax.plot(pDf.T, alpha=alpha, linewidth=linewidth, color=newc, zorder=1, **kwargs)
         
 
-def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,4], figsize=(10,8), longWide='wide',
+def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', figsize=(10,8), longWide='wide',
                 xs=None, queryConditionGroupNames=None, dataLabels=[], xlabels=[], xlabelRotation=0):
     
     ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide,
