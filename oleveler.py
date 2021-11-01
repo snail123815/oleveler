@@ -2547,7 +2547,7 @@ def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.6, sam
         
 
 def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', figsize=(10,8), longWide='wide',
-                xs=None, queryConditionGroupNames=None, dataLabels=[], xlabels=[], xlabelRotation=0):
+                xs=None, queryConditionGroupNames=None, dataLabels=[], xlabels=[], xlabelRotation=0, saveFig=False):
     
     ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide,
                 xs, queryConditionGroupNames, dataLabels, xlabels, xlabelRotation)
@@ -2638,12 +2638,14 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
     figPath = 'Plots/Clustermap'
     os.makedirs(figPath, exist_ok=True)
     figFile = os.path.join(figPath, f'{fname}.svg')
-    if os.path.isfile(figFile):
-        logger.info(f'Cluster expression plot exists: {figFile}')
-    else:
-        logger.info(f'Save cluster expression plot at {figFile}')
-        fig.savefig(figFile)
     
+    if saveFig:
+        if os.path.isfile(figFile):
+            logger.info(f'Cluster expression plot exists: {figFile}')
+        else:
+            logger.info(f'Save cluster expression plot at {figFile}')
+            fig.savefig(figFile)
+
     plt.show()
 
 
