@@ -45,7 +45,7 @@ import rpy2.robjects as robjects
 import rpy2.robjects.packages as rpackages
 from rpy2.rinterface_lib.embedded import RRuntimeError
 
-from matplotlib import cm
+from matplotlib import cm, colors
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.lines import Line2D
@@ -75,11 +75,11 @@ if len(logger.handlers) == 0:
     logfhandler.setLevel(logging.INFO)
     logfhandler.setFormatter(logFormatter)
     logshandler = logging.StreamHandler(stream=sys.stdout)
-    logshandler.setLevel(logging.DEBUG)
+    logshandler.setLevel(logging.INFO)
     logshandler.setFormatter(logFormatter)
     logger.addHandler(logfhandler)
     logger.addHandler(logshandler)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
 logger.info(infoText)
 
@@ -1348,6 +1348,21 @@ def getSig(compDf, tFc=1.5, tPv=0.05):
     return compDf[f]
 
 
+def grayout(c, x=1.2):
+    newc = list(colors.to_rgba(c))
+    for i in range(3):
+        newc[i] = min(newc[i] * 1.2, 1)
+
+
+def calPlotShape(n, h=True):
+    nc = int(np.sqrt(n))
+    nr = n//nc + (1 if n%nc>0 else 0)
+    if h:
+        return nr, nc
+    else:
+        return nc, nr
+
+
 def square_subplots(fig, axs):
     """Make a figure square"""
     try:
@@ -2377,6 +2392,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
 
 def plotHeatmapGetCluster(
     df, index=None, cols=None, nCluster=4, ylabels=None, xlabels='ALL', title='',
+    method='ward', standard_scale=None,
     plot=True, saveFig=False
 ):
     """[summary]
@@ -2391,6 +2407,8 @@ def plotHeatmapGetCluster(
         title (str, optional): [description]. Defaults to ''.
         plot (bool, optional): [description]. Defaults to True.
         saveFig (bool, optional): [description]. Defaults to False.
+        method = 'ward' # single complete average weighted centroid median ward
+        standard_scale = [None, 'row', 'col']
 
     Returns:
         [type]: [description]
@@ -2402,12 +2420,19 @@ def plotHeatmapGetCluster(
         cols = df.columns
     plotDf = df.loc[index,cols]
     # hash para
-    ha = calHash(plotDf, index, cols, nCluster, ylabels, xlabels, title)
+    ha = calHash(plotDf, index, cols, nCluster, ylabels, xlabels, title, method, standard_scale)
+    
+    if standard_scale.lower() == 'row':
+        standard_scale = 0
+    elif standard_scale.lower() == 'col':
+        standard_scale = 1
 
     fname = f'Heatmap_{title}_{ha}'
     plt.close(fname)
     # plot to get cluster info only
-    cg = sns.clustermap(plotDf, method='ward',standard_scale=0, col_cluster=False)
+    cg = sns.clustermap(plotDf, method=method,
+                        standard_scale=standard_scale,
+                        col_cluster=False)
     cg.fig.set_label(fname)
     plt.close(fname)
     cluster = pd.Series(fcluster(cg.dendrogram_row.linkage, nCluster, criterion='maxclust'),
@@ -2415,7 +2440,9 @@ def plotHeatmapGetCluster(
 
     # Assign cluster colours
     lut = dict(zip(cluster.unique(), plt.get_cmap('tab10')(cluster.unique())))
-    cg = sns.clustermap(plotDf, method='ward',standard_scale=0, col_cluster=False,
+    cg = sns.clustermap(plotDf, method=method,
+                        standard_scale=standard_scale,
+                        col_cluster=False,
                         row_colors=cluster.map(lut))
     cg.fig.suptitle(fname)
     cLegends = []
@@ -2481,6 +2508,86 @@ def plotHeatmapGetCluster(
     else:
         plt.close(fname)
     return cluster, fname
+
+
+def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.5, samex=False, **kwargs):
+    if isinstance(index, type(None)):
+        index = plotDf.index
+    pDf = plotDf.loc[index, :]
+    average = pDf.mean(axis=0)
+    removekwargs = ['color', 'label']
+    if samex:
+        x = range(len(pDf.columns))
+        lines = ax.plot(x, average, **kwargs)
+        newc = grayout(lines[0].get_color())
+        kwargs = dict(filter(lambda x: x[0] not in removekwargs, kwargs.items()))
+        ax.plot(x, pDf.T, alpha=alpha, linewidth=linewidth, color=newc, zorder=1, **kwargs)
+    else:
+        lines = ax.plot(average, **kwargs)
+        newc = grayout(lines[0].get_color())
+        kwargs = dict(filter(lambda x: x[0] not in removekwargs, kwargs.items()))
+        ax.plot(pDf.T, alpha=alpha, linewidth=linewidth, color=newc, zorder=1, **kwargs)
+        
+
+def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,4], figsize=(10,8),
+                xs=None, queryConditionGroupNames=None, dataLabels=[], xlabels=[], xlabelRotation=0):
+    
+    clusters = list(set(clusterDf['cluster'].to_list()).intersection(set(clusters)))
+    cNitems = dict(map(lambda x: (x, (clusterDf['cluster'] == x).value_counts()[True]), clusters))
+    clusters.sort(key=lambda x: cNitems[x], reverse=True)
+    fname = 'cluster_' + '_'.join([str(c) for c in clusters]) + '_' + fname
+    plt.close(fname)
+    if isinstance(dataDf, type(None)):
+        dataDf = clusterDf.loc[:, [c for c in clusterDf.columns if c != 'cluster']]
+    
+    if isinstance(conditions, type(None)):
+        conditions = dataDf.columns
+    conditions = np.array(conditions)
+    groups = []
+    assert conditions.ndim in [1, 2]
+    if conditions.ndim == 1:
+        conditions = conditions.reshape(1, -1)
+    # deal with lables (names) input for plot
+    if isinstance(queryConditionGroupNames, type(None)):
+        # generate numbers as labels
+        # if only one dimension, the names will be changed to column names later
+        queryConditionGroupNames = [list(range(x)) for x in conditions.shape]
+    qshape = tuple(len(x) for x in queryConditionGroupNames)
+    assert qshape == conditions.shape, f'{qshape}, {conditions.shape}'
+    
+    nplots = len(clusters)
+    nr, nc = calPlotShape(nplots)
+    fig, axs = plt.subplots(nr, nc, num=fname, sharex=True, sharey=True,
+                            constrained_layout=True, figsize=figsize)
+    
+    if len(conditions) == 2:
+        if len(xlabels) == 0:
+            xlabels = [f'{a}-{b}' for a, b in zip(conditions[0], conditions[1])]
+        if len(dataLabels) == 0:
+            dataLabels = ['.'.join(x) for x in conditions]
+    else:
+        if len(xlabels) == 0:
+            xlabels = conditions[0]
+        if len(dataLabels) == 0:
+            dataLabels = ['data']
+            
+            
+    for ax, c in zip(axs.flatten(), clusters):
+        index = clusterDf[clusterDf['cluster']==c].index
+        plotDf = dataDf.loc[index, :]
+        aDf = plotDf[conditions[0]]
+        plotAverage(ax, aDf, color='C0', label=dataLabels[0])
+        try:
+            bDf = plotDf[conditions[1]]
+            plotAverage(ax, bDf, samex=True, color='C3', label=dataLabels[1])
+        except IndexError:
+            pass
+        ax.legend()
+        ax.annotate(f'cluster {c}, n={len(index)}',(0,1.02), xycoords='axes fraction')
+            
+    for ax in axs.ravel():
+        ax.set_xticklabels(xlabels, rotation=xlabelRotation)
+    fig.suptitle(fname)
 
 
 # Query subset
