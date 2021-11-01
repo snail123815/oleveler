@@ -1352,6 +1352,7 @@ def grayout(c, x=1.2):
     newc = list(colors.to_rgba(c))
     for i in range(3):
         newc[i] = min(newc[i] * 1.2, 1)
+    return newc
 
 
 def calPlotShape(n, longWide='wide'):
@@ -2526,7 +2527,7 @@ def plotHeatmapGetCluster(
     return cluster, fname
 
 
-def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.7, samex=False, **kwargs):
+def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.6, samex=False, **kwargs):
     if isinstance(index, type(None)):
         index = plotDf.index
     pDf = plotDf.loc[index, :]
