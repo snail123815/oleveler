@@ -1693,6 +1693,8 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
                  title, colourSet, rotation, sciLabel,
                  analysisType, plsClasses, square)
     plotName = f'{analysisType} plot - {title}_{ha}'
+    while '__' in plotName:
+        plotName.replace('__', '_')
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
     if cols != None:
@@ -1824,6 +1826,8 @@ def plotPrincipleAnalysis(df, cols=None, note=None, ntop=None, figsize=(6, 5),
 def plotPCAExplanation(PcaClass, title=""):
     ha = calHash(PcaClass, title)
     plotName = f'PCA_explaination_{title}_{ha}'
+    while '__' in plotName:
+        plotName.replace('__', '_')
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
     explainedRatios = PcaClass.explained_variance_ratio_
@@ -1897,6 +1901,8 @@ def plotPrincipleAnalysisLoading(df, cols=None, note=None, ntop=None,
                  outlierAlg, outliersFraction, square,
                  analysisType, plsClasses)
     plotName = f'{analysisType}_loading_{title}_{ha}'
+    while '__' in plotName:
+        plotName.replace('__', '_')
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
 
@@ -2085,6 +2091,8 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
                  outlierAlg, outliersFraction, square,
                  title, tClass, drawOutliers, figsize)
     plotName = f'PLS_Vplot_{title}_{ha}'
+    while '__' in plotName:
+        plotName.replace('__', '_')
     logger.info(f'Plotting {plotName}')
     plt.close(plotName)
 
@@ -2253,13 +2261,15 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
         prog = 'DESeq2'
     else:
         raise ValueError("Do not know result type, make sure 'ImputationPercentage' or 'baseMean' in input data columns")
-    plotName = f'Volcano_{prog}_{title}_{ha}'
-    logger.info(f'Plotting {plotName}')
-    plt.close(plotName)
+    fname = f'Volcano_{prog}_{title}_{ha}'
+    while '__' in fname:
+        fname.replace('__', '_')
+    logger.info(f'Plotting {fname}')
+    plt.close(fname)
 
     directory = f'Plots/Volcano/'
     os.makedirs(directory, exist_ok=True)
-    filePath = os.path.join(directory, plotName)
+    filePath = os.path.join(directory, fname)
 
     # clean up data
     compDf = compDf[~compDf[colFc].isna()]
@@ -2314,7 +2324,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     colours = pd.Series([baseColor]*log2fc.shape[0], index=log2fc.index)
     colours.loc[(~log2fc.between(-lfcThresh, lfcThresh, inclusive='neither')) & (procPval >= logpThresh)] = sigColor
 
-    fig, ax = plt.subplots(1, 1, figsize=figsize, num=plotName)
+    fig, ax = plt.subplots(1, 1, figsize=figsize, num=fname)
     sc = ax.scatter(log2fc, procPval,
                     s=pointSizes, c=colours)
     ax.set_xlim((-xmax, xmax))
@@ -2370,7 +2380,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     if square:
         square_subplots(fig, ax)
 
-    ax.set_title(plotName)
+    ax.set_title(fname)
 
     figFile = filePath+'.svg'
     tabFile = filePath+'.xlsx'
@@ -2430,6 +2440,8 @@ def plotHeatmapGetCluster(
         standard_scale = 1
 
     fname = f'Heatmap_{title}_{ha}'
+    while '__' in fname:
+        fname.replace('__', '_')
     plt.close(fname)
     # plot to get cluster info only
     cg = sns.clustermap(plotDf, method=method,
@@ -2541,6 +2553,8 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters=[1,2,3,
     cNitems = dict(map(lambda x: (x, (clusterDf['cluster'] == x).value_counts()[True]), clusters))
     clusters.sort(key=lambda x: cNitems[x], reverse=True)
     fname = fname + "_" + 'cluster_' + '_'.join([str(c) for c in clusters]) + '_' + ha
+    while '__' in fname:
+        fname.replace('__', '_')
     plt.close(fname)
     if isinstance(dataDf, type(None)):
         dataDf = clusterDf.loc[:, [c for c in clusterDf.columns if c != 'cluster']]
@@ -2624,9 +2638,11 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
           plotType, queryConditionGroupNames, xlabels, xlabelRotation)
     if isinstance(ids, str):
         ids = [ids]
-    plotName = f'query_{plotType}_{title}_{"_".join([i for i in ids[:2]])}_{ha}'
-    logger.info(f'Query with name: {plotName}')
-    plt.close(plotName)
+    fname = f'query_{plotType}_{title}_{"_".join([i for i in ids[:2]])}_{ha}'
+    while '__' in fname:
+        fname.replace('__', '_')
+    logger.info(f'Query with name: {fname}')
+    plt.close(fname)
     # Normalise meanDf,
     Scaler = MinMaxScaler((0, 100))  # linear scaler
     Scaler.fit(meanDf)
@@ -2669,7 +2685,7 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
         groups.append([subMeanDf, subBarDf, gname])
 
     # plotting
-    fig, ax = plt.subplots(1, 1, figsize=figsize, num=plotName)
+    fig, ax = plt.subplots(1, 1, figsize=figsize, num=fname)
     assert len(realIds) == 1 or len(groups) == 1
     if len(realIds) == 1:  # many groups, one id
         # replace column names:
@@ -2732,8 +2748,8 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
     plt.tight_layout()
     savedir = 'Plots/query'
     os.makedirs(savedir, exist_ok=True)
-    figFile = os.path.join(savedir, plotName+'.svg')
-    tabFile = os.path.join(savedir, plotName+'.xlsx')
+    figFile = os.path.join(savedir, fname+'.svg')
+    tabFile = os.path.join(savedir, fname+'.xlsx')
 
     if os.path.isfile(figFile):
         logger.info(f'Figure file exists: {figFile}')
