@@ -2407,7 +2407,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
 
 
 def plotHeatmapGetCluster(
-    df, index=None, cols=None, nCluster=4, ylabels=None, xlabels='ALL', title='',
+    df, index=None, cols=None, nCluster=20, ylabels=None, xlabels='ALL', title='',
     method='ward', standard_scale=None,
     plot=True, saveFig=False
 ):
