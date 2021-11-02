@@ -2625,7 +2625,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
             dataLabels = ['data']
             
     plotted = dict(map(lambda x: [x, 0], axs.ravel()))
-    for ax, cname in zip(axs.ravel(), clusterDataDict):
+    for i, (ax, cname) in enumerate(zip(axs.ravel(), clusterDataDict)):
         index = clusterDataDict[cname]
         plotDf = dataDf.loc[index, :]
         aDf = plotDf[conditions[0]]
@@ -2635,7 +2635,8 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
             plotAverage(ax, bDf, samex=True, color='C3', label=dataLabels[1])
         except IndexError:
             pass
-        ax.legend()
+        if i == 0:
+            ax.legend()
         ax.annotate(f'cluster {cname}, n={len(index)}',(0,1.02), xycoords='axes fraction')
         plotted[ax] = 1
             
