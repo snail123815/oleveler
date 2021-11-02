@@ -2546,10 +2546,10 @@ def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.6, sam
         kwargs = dict(filter(lambda x: x[0] not in removekwargs, kwargs.items()))
         ax.plot(pDf.T, alpha=alpha, linewidth=linewidth, color=newc, zorder=1, **kwargs)
         
-
 def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', figsize=(10,8), longWide='wide', noSort=False,
                 xs=None, queryConditionGroupNames=None, dataLabels=[], xlabels=[], xlabelRotation=0, saveFig=False):
     
+    # Filter clusters before calculating hash
     if isinstance(clusters, str):
         if clusters.lower() == "all":
             clusters = list(set(clusterDf['cluster'].to_list()))
@@ -2557,16 +2557,35 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
         else:
             raise ValueError(f'clusters needs to be either "all" or list of cluster numbers')
     else:
-        clusters = sorted(list(set(clusterDf['cluster'].to_list()).intersection(set(clusters))))
-        cname = '_'.join(clusters)
+        avaClusters = [] # list of lists
+        for c in clusters:
+            #if isinstance(c, list | set | tuple): # for python >= 3.10
+            if isinstance(c, list) or isinstance(c, set) or isinstance(c, tuple):
+                c = sorted(list(set(clusterDf['cluster'].to_list()).intersection(set(c))))
+                if len(c) > 0:
+                    avaClusters.append(c)
+            else:
+                if c in clusterDf['cluster'].to_list():
+                    avaClusters.append([c])
+        clusters = sorted(avaClusters, key=lambda x: x[0])
+        cname = '_'.join(['.'.join([str(x) for x in c]) for c in clusters])
 
     ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide, noSort,
                 xs, queryConditionGroupNames, dataLabels, xlabels, xlabelRotation)
     fname = fname + '_cluster_' + cname + '_' + ha
 
+    # Gather plot index
+    clusterDataDict = OrderedDict()
+    for cs in clusters:
+        ids = clusterDf[clusterDf['cluster']==cs[0]].index.to_list()
+        if len(cs) > 1:
+            for c in cs[1:]:
+                ids.extend(clusterDf[clusterDf['cluster']==c].index.to_list())
+        name = '.'.join([str(x) for x in cs])
+        clusterDataDict[name] = ids
+
     if not noSort:
-        cNitems = dict(map(lambda x: (x, (clusterDf['cluster'] == x).value_counts()[True]), clusters))
-        clusters.sort(key=lambda x: cNitems[x], reverse=True)
+        clusterDataDict = OrderedDict[sorted(clusterDataDict.items(), key=lambda x: len(x[1]), reverse=True)]
     while '__' in fname:
         fname = fname.replace('__', '_')
     plt.close(fname)
@@ -2576,7 +2595,6 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
     if isinstance(conditions, type(None)):
         conditions = dataDf.columns
     conditions = np.array(conditions)
-    groups = []
     assert conditions.ndim in [1, 2]
     if conditions.ndim == 1:
         conditions = conditions.reshape(1, -1)
@@ -2605,8 +2623,8 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
             dataLabels = ['data']
             
     plotted = dict(map(lambda x: [x, 0], axs.ravel()))
-    for ax, c in zip(axs.ravel(), clusters):
-        index = clusterDf[clusterDf['cluster']==c].index
+    for ax, cname in zip(axs.ravel(), clusterDataDict):
+        index = clusterDataDict[cname]
         plotDf = dataDf.loc[index, :]
         aDf = plotDf[conditions[0]]
         plotAverage(ax, aDf, color='C0', label=dataLabels[0])
@@ -2616,7 +2634,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
         except IndexError:
             pass
         ax.legend()
-        ax.annotate(f'cluster {c}, n={len(index)}',(0,1.02), xycoords='axes fraction')
+        ax.annotate(f'cluster {cname}, n={len(index)}',(0,1.02), xycoords='axes fraction')
         plotted[ax] = 1
             
     if axs.ndim == 2:
