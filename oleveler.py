@@ -2552,7 +2552,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
     # Filter clusters before calculating hash
     if isinstance(clusters, str):
         if clusters.lower() == "all":
-            clusters = list(set(clusterDf['cluster'].to_list()))
+            clusters = [[c] for c in list(set(clusterDf['cluster'].to_list()))]
             cname = 'all'
         else:
             raise ValueError(f'clusters needs to be either "all" or list of cluster numbers')
