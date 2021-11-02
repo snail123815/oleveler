@@ -2665,6 +2665,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
     figPath = 'Plots/Clustermap'
     os.makedirs(figPath, exist_ok=True)
     figFile = os.path.join(figPath, f'{fname}.svg')
+    tabFile = os.path.join(figPath, f'{fname}.xlsx')
     
     if saveFig:
         if os.path.isfile(figFile):
@@ -2672,6 +2673,14 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
         else:
             logger.info(f'Save cluster expression plot at {figFile}')
             fig.savefig(figFile)
+        if os.path.isfile(tabFile):
+            logger.info(f'Cluster ids table exists: {tabFile}')
+        else:
+            logger.info(f'Save cluster ids table at {tabFile}')
+            saveDataDf = pd.concat([pd.Series(sorted(y), name=x) for x,y in clusterDataDict.items()], axis=1)
+            saveDataDf.index = list(range(1, saveDataDf.shape[0]+1))
+            saveDataDf.index.name = 'clusters->'
+            saveDataDf.to_excel(tabFile)
 
     plt.show()
 
