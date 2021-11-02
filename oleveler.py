@@ -2547,7 +2547,7 @@ def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.6, sam
         ax.plot(pDf.T, alpha=alpha, linewidth=linewidth, color=newc, zorder=1, **kwargs)
         
 
-def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', figsize=(10,8), longWide='wide',
+def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', figsize=(10,8), longWide='wide', noSort=False,
                 xs=None, queryConditionGroupNames=None, dataLabels=[], xlabels=[], xlabelRotation=0, saveFig=False):
     
     if isinstance(clusters, str):
@@ -2560,12 +2560,13 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
         clusters = sorted(list(set(clusterDf['cluster'].to_list()).intersection(set(clusters))))
         cname = '_'.join(clusters)
 
-    ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide,
+    ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide, noSort,
                 xs, queryConditionGroupNames, dataLabels, xlabels, xlabelRotation)
     fname = fname + '_cluster_' + cname + '_' + ha
 
-    cNitems = dict(map(lambda x: (x, (clusterDf['cluster'] == x).value_counts()[True]), clusters))
-    clusters.sort(key=lambda x: cNitems[x], reverse=True)
+    if not noSort:
+        cNitems = dict(map(lambda x: (x, (clusterDf['cluster'] == x).value_counts()[True]), clusters))
+        clusters.sort(key=lambda x: cNitems[x], reverse=True)
     while '__' in fname:
         fname = fname.replace('__', '_')
     plt.close(fname)
