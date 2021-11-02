@@ -2550,19 +2550,22 @@ def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.6, sam
 def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', figsize=(10,8), longWide='wide',
                 xs=None, queryConditionGroupNames=None, dataLabels=[], xlabels=[], xlabelRotation=0, saveFig=False):
     
-    ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide,
-                xs, queryConditionGroupNames, dataLabels, xlabels, xlabelRotation)
-    
     if isinstance(clusters, str):
         if clusters.lower() == "all":
             clusters = list(set(clusterDf['cluster'].to_list()))
+            cname = 'all'
         else:
             raise ValueError(f'clusters needs to be either "all" or list of cluster numbers')
     else:
-        clusters = list(set(clusterDf['cluster'].to_list()).intersection(set(clusters)))
+        clusters = sorted(list(set(clusterDf['cluster'].to_list()).intersection(set(clusters))))
+        cname = '_'.join(clusters)
+
+    ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide,
+                xs, queryConditionGroupNames, dataLabels, xlabels, xlabelRotation)
+    fname = fname + '_cluster_' + cname + '_' + ha
+
     cNitems = dict(map(lambda x: (x, (clusterDf['cluster'] == x).value_counts()[True]), clusters))
     clusters.sort(key=lambda x: cNitems[x], reverse=True)
-    fname = fname + "_" + 'cluster_' + '_'.join([str(c) for c in clusters]) + '_' + ha
     while '__' in fname:
         fname = fname.replace('__', '_')
     plt.close(fname)
