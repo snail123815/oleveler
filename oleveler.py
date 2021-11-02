@@ -1349,10 +1349,10 @@ def getSig(compDf, tFc=1.5, tPv=0.05):
     return compDf[f]
 
 
-def grayout(c, x=1.2):
+def grayout(c, x=1.8):
     newc = list(colors.to_rgba(c))
     for i in range(3):
-        newc[i] = min(newc[i] * 1.2, 1)
+        newc[i] = min(newc[i] * x, 1)
     return newc
 
 
