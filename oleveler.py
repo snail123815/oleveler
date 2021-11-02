@@ -2567,7 +2567,9 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
             else:
                 if c in clusterDf['cluster'].to_list():
                     avaClusters.append([c])
-        clusters = sorted(avaClusters, key=lambda x: x[0])
+        clusters = avaClusters
+        if not noSort:
+            clusters = sorted(clusters, key=lambda x: x[0])
         cname = '_'.join(['.'.join([str(x) for x in c]) for c in clusters])
 
     ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide, noSort,
