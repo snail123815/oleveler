@@ -2585,7 +2585,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
         clusterDataDict[name] = ids
 
     if not noSort:
-        clusterDataDict = OrderedDict[sorted(clusterDataDict.items(), key=lambda x: len(x[1]), reverse=True)]
+        clusterDataDict = OrderedDict(sorted(clusterDataDict.items(), key=lambda x: len(x[1]), reverse=True))
     while '__' in fname:
         fname = fname.replace('__', '_')
     plt.close(fname)
