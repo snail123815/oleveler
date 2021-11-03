@@ -65,6 +65,7 @@ from sklearn.svm import OneClassSVM
 from sklearn.covariance import EllipticEnvelope
 
 from scipy.cluster.hierarchy import fcluster
+from jupyterthemes import jtplot
 
 logger = logging.getLogger()
 logging.getLogger('matplotlib.font_manager').disabled = True
@@ -83,6 +84,20 @@ if len(logger.handlers) == 0:
     logger.setLevel(logging.INFO)
 
 logger.info(infoText)
+
+
+def setDarkModePlotting(forceDark=False):
+    if 'current_jupyterthemes_style_dark' not in globals():
+        global current_jupyterthemes_style_dark
+        current_jupyterthemes_style_dark = False
+    if current_jupyterthemes_style_dark and not forceDark:
+        logger.warning('Change plot style to default')
+        jtplot.reset()
+        current_jupyterthemes_style_dark = False
+    else:
+        logger.warning('Change plot style to dark (monokai)')
+        jtplot.style(theme='monokai', context='notebook', ticks=True, grid=False)
+        current_jupyterthemes_style_dark = True
 
 
 def writeRSessionInfo(fileName, overwrite=True, logger=None):
