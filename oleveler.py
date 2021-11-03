@@ -86,6 +86,14 @@ if len(logger.handlers) == 0:
 logger.info(infoText)
 
 
+def displayImage(src, background=None):
+    from IPython.core.display import HTML
+    htmlstr = f'<img src={src} />'
+    if not isinstance(background, type(None)):
+        htmlstr = htmlstr[:-2] + f'style="background-color:{background}"' + htmlstr[-2:]
+    return HTML(htmlstr)
+
+
 def setDarkModePlotting(forceDark=False):
     if 'current_jupyterthemes_style_dark' not in globals():
         global current_jupyterthemes_style_dark
