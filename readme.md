@@ -38,6 +38,9 @@ BiocManager::install(c("DESeq2", "MSstats", "apeglm"))
 
 - [x] Close temp files opened due to required compatibility to windows
 - [x] \*DESeq2 will die when too many comparisons will run in the same R kernel. This often happens because each comparison consume to much memory and thus leads to memory surge or other problem. Solved by removing tempfiles etc.
+- [ ] Add queryLfc()
+- [ ] Add queryViolin()
+  - For query gene list
 - [ ] Pack related functions
 - [ ] Add references list
   - apeglm<sup>[1][1]</sup>

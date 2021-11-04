@@ -2478,7 +2478,9 @@ def plotHeatmapGetCluster(
     # hash para
     ha = calHash(plotDf, index, cols, nCluster, ylabels, xlabels, title, method, standard_scale)
     
-    if standard_scale.lower() == 'row':
+    if isinstance(standard_scale, type(None)):
+        pass
+    elif standard_scale.lower() == 'row':
         standard_scale = 0
     elif standard_scale.lower() == 'col':
         standard_scale = 1
