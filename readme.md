@@ -27,6 +27,13 @@ Please include `%matplotlib widget` to allow interactive plotting. However, with
   - DESeq2
   - apeglm # for lfc shrinkage
 
+```r
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install(c("DESeq2", "MSstats", "apeglm"))
+```
+
 ## TODO:
 
 - [x] Close temp files opened due to required compatibility to windows
