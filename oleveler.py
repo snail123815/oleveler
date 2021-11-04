@@ -111,11 +111,11 @@ def displayImage(src, background=None, **kwargs):
             display(img)
 
 
-def setDarkModePlotting(forceDark=False):
+def setDarkModePlotting(forceDark=False, forceWhite=False):
     if 'current_jupyterthemes_style_dark' not in globals():
         global current_jupyterthemes_style_dark
         current_jupyterthemes_style_dark = False
-    if current_jupyterthemes_style_dark and not forceDark:
+    if (current_jupyterthemes_style_dark and not forceDark) or forceWhite:
         logger.warning('Change plot style to default')
         jtplot.reset()
         current_jupyterthemes_style_dark = False
