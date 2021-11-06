@@ -2373,6 +2373,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     # Process points to be highlighted:
     hlDict = OrderedDict()  # 'name': color
     zorders = pd.Series(np.zeros(log2fc.shape), index=log2fc.index)
+    zorders.loc[sigFilter] = 1
     defaultHighlightColours = cycle([colors.to_rgba(f'C{i}') for i in range(1, 10)])
 
     def changeColours(hls, colours, c):
@@ -2424,13 +2425,13 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     pointSizes = pointSizes[newidx]
 
     labels = [n for n in reversed(hlDict)]
-    legends = [(plt.scatter([],[], marker='o', color=hlDict[n]),
-                plt.scatter([],[], marker='o', color=grayout(hlDict[n]))) for n in reversed(hlDict)]
+    legends = [(plt.scatter([], [], marker='o', color=hlDict[n]),
+                plt.scatter([], [], marker='o', color=grayout(hlDict[n]))) for n in reversed(hlDict)]
     if len(legends) > 0:
         legends += [Line2D([0], [0], marker='o', linewidth=0, color='k', markersize=0)]
         labels += ['']
-    legends += [(plt.scatter([],[], marker='o', color=sigColor),
-                plt.scatter([],[], marker='o', color=baseColor))]
+    legends += [(plt.scatter([], [], marker='o', color=sigColor),
+                 plt.scatter([], [], marker='o', color=baseColor))]
     labels += ['Other genes']
 
     fig, ax = plt.subplots(1, 1, figsize=figsize, num=fname)
@@ -2447,7 +2448,6 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     ax.axvline(lfcThresh,  c=lineColor, linestyle='--', linewidth=0.3)
     ax.set_xlabel(r'$log_2$(fold change)')
     ax.set_ylabel(r'$-log_{10}$(adjusted P-value)')
-    print(legends)
     ax.legend(legends, labels, scatterpoints=1,
               numpoints=1, handler_map={tuple: HandlerTuple(ndivide=None)})
 
