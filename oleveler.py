@@ -2292,6 +2292,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
 
     """
     ha = calHash(compDf, quantSeries, figsize,
+                 highlights,
                  square, lfcThresh, pThresh,
                  xmax, ymax,
                  title)
@@ -2440,40 +2441,27 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     ax.axvline(lfcThresh,  c=lineColor, linestyle='--', linewidth=0.3)
     ax.set_xlabel(r'$log_2$(fold change)')
     ax.set_ylabel(r'$-log_{10}$(adjusted P-value)')
+    ax.legend(handles=legends)
 
-    fixedXlim = True
-    fixedYlim = True
     # hovering data and functions
     labels = log2fc.index
-    ymin, ymax = ax.get_ylim()
-    xmin, xmax = ax.get_xlim()
-    if not fixedYlim:
-        ymin, ymax = _extendRange((ymin, ymax), 1.1)
-    if not fixedXlim:
-        xmin, xmax = _extendRange((xmin, xmax), 1.1)
     lnv = ax.plot([0, 0], [ymin, ymax], color=lineColor,
-                #  linestyle='dashed',
+                  linestyle='--',
                   linewidth=0.3)[0]
-    lnh = ax.plot([xmin, xmax], [0, 0], color=lineColor,
-                #  linestyle='dashed',
+    lnh = ax.plot([-xmax, xmax], [0, 0], color=lineColor,
+                  linestyle='--',
                   linewidth=0.3)[0]
-    ax.set_xlim((xmin, xmax))
-    ax.set_ylim((ymin, ymax))
-    lnv.set_linestyle('None')
-    ax.legend(handles=legends)
-    lnh.set_linestyle('None')
     annot = ax.annotate('', xy=(0, 0), xytext=(5, 5), textcoords="offset points")
     annot.set_visible(False)
+    lnv.set_visible(False)
+    lnh.set_visible(False)
 
     def hover(event):
         if event.inaxes == ax:
             lnv.set_data([event.xdata, event.xdata], [ymin, ymax])
-            lnh.set_data([xmin, xmax], [event.ydata, event.ydata])
-            lnv.set_linestyle('--')
-            lnh.set_linestyle('--')
+            lnh.set_data([-xmax, xmax], [event.ydata, event.ydata])
             lnv.set_visible(True)
             lnh.set_visible(True)
-            # Test if on data points
             cont, ind = sc.contains(event)
             if cont:
                 annot.xy = (event.xdata, event.ydata)
