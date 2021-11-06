@@ -15,6 +15,8 @@ from sklearn.ensemble import IsolationForest
 from sklearn.cross_decomposition import PLSRegression as PLS
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
+from matplotlib.legend_handler import HandlerLine2D, HandlerTuple
+from matplotlib.collections import PathCollection
 import seaborn as sns
 import matplotlib.gridspec as gridspec
 from matplotlib.patches import Patch
@@ -2421,11 +2423,15 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     colours = colours[newidx]
     pointSizes = pointSizes[newidx]
 
-    legends = [Line2D([0], [0], marker='o', linewidth=0, color=hlDict[n], label=n) for n in reversed(hlDict)]
+    labels = [n for n in reversed(hlDict)]
+    legends = [(plt.scatter([],[], marker='o', color=hlDict[n]),
+                plt.scatter([],[], marker='o', color=grayout(hlDict[n]))) for n in reversed(hlDict)]
     if len(legends) > 0:
-        legends += [Line2D([0], [0], marker='o', linewidth=0, color='k', markersize=0, label='')]
-    legends += [Line2D([0], [0], marker='o', linewidth=0, color=sigColor, label='Significant'),
-                Line2D([0], [0], marker='o', linewidth=0, color=baseColor, label='Insignificant')]
+        legends += [Line2D([0], [0], marker='o', linewidth=0, color='k', markersize=0)]
+        labels += ['']
+    legends += [(plt.scatter([],[], marker='o', color=sigColor),
+                plt.scatter([],[], marker='o', color=baseColor))]
+    labels += ['Other genes']
 
     fig, ax = plt.subplots(1, 1, figsize=figsize, num=fname)
     sc = ax.scatter(log2fc, procPval,
@@ -2441,7 +2447,9 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     ax.axvline(lfcThresh,  c=lineColor, linestyle='--', linewidth=0.3)
     ax.set_xlabel(r'$log_2$(fold change)')
     ax.set_ylabel(r'$-log_{10}$(adjusted P-value)')
-    ax.legend(handles=legends)
+    print(legends)
+    ax.legend(legends, labels, scatterpoints=1,
+              numpoints=1, handler_map={tuple: HandlerTuple(ndivide=None)})
 
     # hovering data and functions
     labels = log2fc.index
