@@ -30,7 +30,7 @@ from itertools import cycle
 from multiprocessing import Process
 from threading import Thread
 from tempfile import NamedTemporaryFile
-from hashlib import md5
+from hashlib import md5, new
 from datetime import datetime
 from collections import OrderedDict
 from time import sleep  # may be used in the notebook
@@ -2277,6 +2277,7 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
 
 
 def plotVolcano(compDf, quantSeries, figsize=(6, 5),
+                highlights=dict(), # dict(color: [genes]) or [[genes],[genes],[genes]]
                 square=True, lfcThresh=1, pThresh=0.05,
                 xmax=None, ymax=None,
                 title=''):
@@ -2363,10 +2364,71 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     pointSizes = calculateSize(quantSeries)
 
     # Colours
-    baseColor = 'C0'
-    sigColor = 'C1'
+    baseColor = colors.to_rgba('C0')
+    sigColor = colors.to_rgba('C1')
     colours = pd.Series([baseColor]*log2fc.shape[0], index=log2fc.index)
-    colours.loc[(~log2fc.between(-lfcThresh, lfcThresh, inclusive='neither')) & (procPval >= logpThresh)] = sigColor
+    sigFilter = (~log2fc.between(-lfcThresh, lfcThresh, inclusive='neither')) & (procPval >= logpThresh)
+    colours.loc[sigFilter] = [sigColor]*sigFilter.sum()
+
+    # Process points to be highlighted:
+    #   Put a legend
+    hlDict = OrderedDict() # 'name': color
+    zorders = pd.Series(np.zeros(log2fc.shape), index=log2fc.index)
+    defaultHighlightColours = cycle([colors.to_rgba(f'C{i}') for i in range(2,10)])
+
+    def changeColours(hls, colours, c):
+        nonSigC = grayout(c)
+        sf =  log2fc[hls][sigFilter].index
+        nsf = log2fc[hls][~sigFilter].index
+        colours.loc[sf] = [c] * len(sf)
+        colours.loc[nsf] = [nonSigC] * len(nsf)
+        return colours
+
+    if isinstance(highlights, list):
+        if not isinstance(highlights[0], list):
+            highlights = [highlights]
+        # Check list and keep only correct ones
+        nhls = []
+        for hls in highlights:
+            nls = []
+            for i in hls:
+                if i in log2fc.index:
+                    nls.append(i)
+                else:
+                    logger.warning(f'{i} do not have valid corresponding data, ignored')
+            if len(nls)>0:
+                nhls.append(nls)
+        highlights = nhls
+
+        for i, hls in enumerate(reversed(highlights)):
+            c = next(defaultHighlightColours)
+            hlDict[','.join(hls)[:16]] = c
+            zorders.loc[hls] = i + 1
+            colours = changeColours(hls, colours, c)
+    elif isinstance(highlights, dict) or isinstance(highlights, OrderedDict):
+        # this dict should be 'name': [genes] or 'name': [color, [genes]]
+        for i, (name, hls) in enumerate(reversed(highlights.items())):
+            try:
+                assert isinstance(hls[1], list)
+                c = hls[0]
+                hls = hls[1]
+            except (IndexError, AssertionError):
+                c = next(defaultHighlightColours)
+            hlDict[name] = c
+            zorders.loc[hls] = i + 1
+            colours = changeColours(hls, colours, c)
+
+    newidx = sorted(log2fc.index.tolist(), key=lambda x: zorders[x])
+    log2fc = log2fc[newidx]
+    procPval = procPval[newidx]
+    colours = colours[newidx]
+    pointSizes = pointSizes[newidx]
+
+    legends = [Line2D([0],[0], marker='o', linewidth=0, color=hlDict[n], label=n) for n in reversed(hlDict)]
+    if len(legends) > 0:
+        legends += [Line2D([0],[0], marker='o', linewidth=0, color='k', markersize=0, label='')]
+    legends += [Line2D([0],[0], marker='o', linewidth=0, color=sigColor, label='Significant'),
+                Line2D([0],[0], marker='o', linewidth=0, color=baseColor, label='Insignificant')]
 
     fig, ax = plt.subplots(1, 1, figsize=figsize, num=fname)
     sc = ax.scatter(log2fc, procPval,
@@ -2396,6 +2458,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     ax.set_xlim((xmin, xmax))
     ax.set_ylim((ymin, ymax))
     lnv.set_linestyle('None')
+    ax.legend(handles=legends)
     lnh.set_linestyle('None')
     annot = ax.annotate('', xy=(0, 0), xytext=(5, 5), textcoords="offset points")
     annot.set_visible(False)
