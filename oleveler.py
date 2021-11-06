@@ -6,6 +6,45 @@
 # durand[dot]dc[at]hot[no space]mail.com
 ############################################
 
+from jupyterthemes import jtplot
+from scipy.cluster.hierarchy import fcluster
+from sklearn.covariance import EllipticEnvelope
+from sklearn.svm import OneClassSVM
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.ensemble import IsolationForest
+from sklearn.cross_decomposition import PLSRegression as PLS
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
+import seaborn as sns
+import matplotlib.gridspec as gridspec
+from matplotlib.patches import Patch
+import matplotlib.ticker as mtick
+from matplotlib.lines import Line2D
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+from matplotlib import cm, colors
+from rpy2.rinterface_lib.embedded import RRuntimeError
+import rpy2.robjects.packages as rpackages
+import rpy2.robjects as robjects
+from BCBio import GFF
+from pandas.errors import EmptyDataError
+import pandas as pd
+from numpy.lib.arraysetops import isin
+import numpy as np
+from time import sleep  # may be used in the notebook
+from collections import OrderedDict
+from datetime import datetime
+from hashlib import md5, new
+from tempfile import NamedTemporaryFile
+from threading import Thread
+from multiprocessing import Process
+from itertools import cycle
+import io
+import json
+import sys
+import logging
+import pickle
+import os
 olevelerVersion = 1.0
 infoText = f'''
 Oleveler - omics data analysis tools for jupyter notebook
@@ -20,52 +59,6 @@ durand[dot]dc[at]hot[no space]mail.com
 
 '''
 
-import os
-import pickle
-import logging
-import sys
-import json
-import io
-from itertools import cycle
-from multiprocessing import Process
-from threading import Thread
-from tempfile import NamedTemporaryFile
-from hashlib import md5, new
-from datetime import datetime
-from collections import OrderedDict
-from time import sleep  # may be used in the notebook
-
-import numpy as np
-from numpy.lib.arraysetops import isin
-import pandas as pd
-from pandas.errors import EmptyDataError
-
-from BCBio import GFF
-
-import rpy2.robjects as robjects
-import rpy2.robjects.packages as rpackages
-from rpy2.rinterface_lib.embedded import RRuntimeError
-
-from matplotlib import cm, colors
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-from matplotlib.lines import Line2D
-import matplotlib.ticker as mtick
-from matplotlib.patches import Patch
-import matplotlib.gridspec as gridspec
-
-import seaborn as sns
-
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
-from sklearn.decomposition import PCA
-from sklearn.cross_decomposition import PLSRegression as PLS
-from sklearn.ensemble import IsolationForest
-from sklearn.neighbors import LocalOutlierFactor
-from sklearn.svm import OneClassSVM
-from sklearn.covariance import EllipticEnvelope
-
-from scipy.cluster.hierarchy import fcluster
-from jupyterthemes import jtplot
 
 logger = logging.getLogger()
 logging.getLogger('matplotlib.font_manager').disabled = True
@@ -126,7 +119,7 @@ def setDarkModePlotting(forceDark=False, forceWhite=False):
 
 
 def writeRSessionInfo(fileName, overwrite=True, logger=None):
-    
+
     def printToString(*args, **kwargs):
         with io.StringIO() as output:
             print(*args, file=output, **kwargs)
@@ -139,7 +132,7 @@ def writeRSessionInfo(fileName, overwrite=True, logger=None):
         sinfo = 'Attached packages in current R session:\n' + '=' * 80 + '\n'
         for l in robjects.r('sessionInfo()["otherPkgs"]')[0]:
             x = printToString(l).split('\n')
-            y = [a for a in x if len(a)>0 and not a.startswith('-- File:')]
+            y = [a for a in x if len(a) > 0 and not a.startswith('-- File:')]
             z = '\n'.join(y) + '\n\n' + "=" * 80 + '\n'
             sinfo += z
     except TypeError:
@@ -671,7 +664,7 @@ def getStats(dataDf, experiments, title=''):
     If you want to exclude any data, do that before passing data in here.
     """
     # calculate hash for parameters
-    ha = calHash(dataDf, experiments) # skipping title for now
+    ha = calHash(dataDf, experiments)  # skipping title for now
 
     meanTbFile = f'dataTables/mean_{title}_{ha}.tsv'.replace('__', '_')
     nquantTbFile = f'dataTables/nquant_{title}_{ha}.tsv'.replace('__', '_')
@@ -1389,16 +1382,20 @@ def getSig(compDf, tFc=1.5, tPv=0.05):
     return compDf[f]
 
 
-def grayout(c, x=1.8):
+def grayout(c, scale=1.8):
     newc = list(colors.to_rgba(c))
+    target = 1
+    if "current_jupyterthemes_style_dark" in globals():
+        if current_jupyterthemes_style_dark:
+            target = 0
     for i in range(3):
-        newc[i] = min(newc[i] * x, 1)
+        newc[i] = target + (newc[i] - target)/scale
     return newc
 
 
 def calPlotShape(n, longWide='wide'):
     nc = int(np.sqrt(n))
-    nr = n//nc + (1 if n%nc>0 else 0)
+    nr = n//nc + (1 if n % nc > 0 else 0)
     if longWide == 'wide':
         return nr, nc
     elif longWide == 'long':
@@ -1619,7 +1616,7 @@ def plotCorr(df, cols=None, method='pearson', fontsize=6, figsize=(6, 5),
     corrDf = df.corr(method=method)
     plotName = 'Correlation_'
     for c in cols[:2]:
-        plotName+=f"_{c}"
+        plotName += f"_{c}"
     plotName += ha
     while '__' in plotName:
         plotName = plotName.replace('__', '_')
@@ -1904,7 +1901,7 @@ def plotPCAExplanation(PcaClass, title=""):
     else:
         logger.info(f'Save PCA explanation data at {tabFile}')
         pd.DataFrame(PcaClass.explained_variance_ratio_).to_excel(tabFile)
-    
+
     plt.show()
 
 
@@ -2277,7 +2274,7 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
 
 
 def plotVolcano(compDf, quantSeries, figsize=(6, 5),
-                highlights=dict(), # dict(color: [genes]) or [[genes],[genes],[genes]]
+                highlights=dict(),  # dict(color: [genes]) or [[genes],[genes],[genes]]
                 square=True, lfcThresh=1, pThresh=0.05,
                 xmax=None, ymax=None,
                 title=''):
@@ -2295,9 +2292,9 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
 
     """
     ha = calHash(compDf, quantSeries, figsize,
-                square, lfcThresh, pThresh,
-                xmax, ymax,
-                title)
+                 square, lfcThresh, pThresh,
+                 xmax, ymax,
+                 title)
     colFc = 'log2FC'
     colPv = 'adj.pvalue'
     if 'ImputationPercentage' in compDf.columns:
@@ -2364,21 +2361,20 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     pointSizes = calculateSize(quantSeries)
 
     # Colours
-    baseColor = colors.to_rgba('C0')
-    sigColor = colors.to_rgba('C1')
+    sigColor = colors.to_rgba('C0')
+    baseColor = grayout(sigColor)
     colours = pd.Series([baseColor]*log2fc.shape[0], index=log2fc.index)
     sigFilter = (~log2fc.between(-lfcThresh, lfcThresh, inclusive='neither')) & (procPval >= logpThresh)
     colours.loc[sigFilter] = [sigColor]*sigFilter.sum()
 
     # Process points to be highlighted:
-    #   Put a legend
-    hlDict = OrderedDict() # 'name': color
+    hlDict = OrderedDict()  # 'name': color
     zorders = pd.Series(np.zeros(log2fc.shape), index=log2fc.index)
-    defaultHighlightColours = cycle([colors.to_rgba(f'C{i}') for i in range(2,10)])
+    defaultHighlightColours = cycle([colors.to_rgba(f'C{i}') for i in range(1, 10)])
 
     def changeColours(hls, colours, c):
         nonSigC = grayout(c)
-        sf =  log2fc[hls][sigFilter].index
+        sf = log2fc[hls][sigFilter].index
         nsf = log2fc[hls][~sigFilter].index
         colours.loc[sf] = [c] * len(sf)
         colours.loc[nsf] = [nonSigC] * len(nsf)
@@ -2396,7 +2392,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
                     nls.append(i)
                 else:
                     logger.warning(f'{i} do not have valid corresponding data, ignored')
-            if len(nls)>0:
+            if len(nls) > 0:
                 nhls.append(nls)
         highlights = nhls
 
@@ -2424,22 +2420,24 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     colours = colours[newidx]
     pointSizes = pointSizes[newidx]
 
-    legends = [Line2D([0],[0], marker='o', linewidth=0, color=hlDict[n], label=n) for n in reversed(hlDict)]
+    legends = [Line2D([0], [0], marker='o', linewidth=0, color=hlDict[n], label=n) for n in reversed(hlDict)]
     if len(legends) > 0:
-        legends += [Line2D([0],[0], marker='o', linewidth=0, color='k', markersize=0, label='')]
-    legends += [Line2D([0],[0], marker='o', linewidth=0, color=sigColor, label='Significant'),
-                Line2D([0],[0], marker='o', linewidth=0, color=baseColor, label='Insignificant')]
+        legends += [Line2D([0], [0], marker='o', linewidth=0, color='k', markersize=0, label='')]
+    legends += [Line2D([0], [0], marker='o', linewidth=0, color=sigColor, label='Significant'),
+                Line2D([0], [0], marker='o', linewidth=0, color=baseColor, label='Insignificant')]
 
     fig, ax = plt.subplots(1, 1, figsize=figsize, num=fname)
     sc = ax.scatter(log2fc, procPval,
                     s=pointSizes, c=colours)
     ax.set_xlim((-xmax, xmax))
     ax.set_ylim((ymin, ymax))
-#     ax.set_xlim((-xmax*1.01, xmax*1.01))
-#     ax.set_ylim((ymin*1.01, ymax*1.01))
-    ax.axhline(logpThresh, c='k', linestyle='--', linewidth=0.3)
-    ax.axvline(-lfcThresh, c='k', linestyle='--', linewidth=0.3)
-    ax.axvline(lfcThresh, c='k', linestyle='--', linewidth=0.3)
+    lineColor = 'k'
+    if "current_jupyterthemes_style_dark" in globals():
+        if current_jupyterthemes_style_dark:
+            lineColor = 'w'
+    ax.axhline(logpThresh, c=lineColor, linestyle='--', linewidth=0.3)
+    ax.axvline(-lfcThresh, c=lineColor, linestyle='--', linewidth=0.3)
+    ax.axvline(lfcThresh,  c=lineColor, linestyle='--', linewidth=0.3)
     ax.set_xlabel(r'$log_2$(fold change)')
     ax.set_ylabel(r'$-log_{10}$(adjusted P-value)')
 
@@ -2453,8 +2451,12 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
         ymin, ymax = _extendRange((ymin, ymax), 1.1)
     if not fixedXlim:
         xmin, xmax = _extendRange((xmin, xmax), 1.1)
-    lnv = ax.plot([0, 0], [ymin, ymax], color='black', linewidth=0.3)[0]
-    lnh = ax.plot([xmin, xmax], [0, 0], color='black', linewidth=0.3)[0]
+    lnv = ax.plot([0, 0], [ymin, ymax], color=lineColor,
+                #  linestyle='dashed',
+                  linewidth=0.3)[0]
+    lnh = ax.plot([xmin, xmax], [0, 0], color=lineColor,
+                #  linestyle='dashed',
+                  linewidth=0.3)[0]
     ax.set_xlim((xmin, xmax))
     ax.set_ylim((ymin, ymax))
     lnv.set_linestyle('None')
@@ -2537,10 +2539,10 @@ def plotHeatmapGetCluster(
         index = df.index
     if isinstance(cols, type(None)):
         cols = df.columns
-    plotDf = df.loc[index,cols]
+    plotDf = df.loc[index, cols]
     # hash para
     ha = calHash(plotDf, index, cols, nCluster, ylabels, xlabels, title, method, standard_scale)
-    
+
     if isinstance(standard_scale, type(None)):
         pass
     elif standard_scale.lower() == 'row':
@@ -2559,7 +2561,7 @@ def plotHeatmapGetCluster(
     cg.fig.set_label(fname)
     plt.close(fname)
     cluster = pd.Series(fcluster(cg.dendrogram_row.linkage, nCluster, criterion='maxclust'),
-                        index = plotDf.index, name='cluster')
+                        index=plotDf.index, name='cluster')
 
     # Assign cluster colours
     lut = dict(zip(cluster.unique(), cycle(plt.get_cmap('tab10')(range(10)))))
@@ -2572,15 +2574,15 @@ def plotHeatmapGetCluster(
     for l in sorted(list(lut.keys())):
         cLegends.append(Patch(facecolor=lut[l], edgecolor=None, label=f'Cluster {l}'))
     cg.fig.set_label(fname)
-    cg.fig.legend(handles=cLegends,loc=3)
+    cg.fig.legend(handles=cLegends, loc=3)
     newgs = gridspec.GridSpec(ncols=5, nrows=3, top=0.95,
                               width_ratios=[0.15, 0.02, 0.68, 0.12, 0.03],
-                              height_ratios=[0.3,0.2,0.5],
+                              height_ratios=[0.3, 0.2, 0.5],
                               figure=cg.fig)
-    cg.ax_row_dendrogram.set_subplotspec(newgs[:,0])
-    cg.ax_row_colors.set_subplotspec(newgs[:,1])
-    cg.ax_heatmap.set_subplotspec(newgs[:,2])
-    cg.cax.set_subplotspec(newgs[1,4])
+    cg.ax_row_dendrogram.set_subplotspec(newgs[:, 0])
+    cg.ax_row_colors.set_subplotspec(newgs[:, 1])
+    cg.ax_heatmap.set_subplotspec(newgs[:, 2])
+    cg.cax.set_subplotspec(newgs[1, 4])
     # Transformed data
     data2d = cg.data2d
     # Set x and y tick labels
@@ -2604,18 +2606,18 @@ def plotHeatmapGetCluster(
         pass
     else:
         if xlabels == 'ALL':
-            xlabels = data2d.columns 
+            xlabels = data2d.columns
         assert len(xlabels) == data2d.shape[1], f'xlabels needs to have {data2d.shape[1]} elements'
         cg.ax_heatmap.set_xticks(np.linspace(0.5, data2d.shape[1]-0.5, data2d.shape[1]))
         cg.ax_heatmap.set_xticklabels(xlabels)
-    
+
     # Output data
     cluster = pd.concat((data2d, cluster), axis=1)
     # Save figure and data
     if plot and saveFig:
-        figPath='Plots/Clustermap'
-        figFile=os.path.join(figPath, fname+'.svg')
-        tabFile=os.path.join(figPath, fname+'.xlsx')
+        figPath = 'Plots/Clustermap'
+        figFile = os.path.join(figPath, fname+'.svg')
+        tabFile = os.path.join(figPath, fname+'.xlsx')
         os.makedirs(figPath, exist_ok=True)
         if os.path.isfile(figFile):
             logger.info(f'Cluster plot exists: {figFile}')
@@ -2650,10 +2652,11 @@ def plotAverage(ax, plotDf, index=None, cols=None, alpha=0.1, linewidth=0.6, sam
         newc = grayout(lines[0].get_color())
         kwargs = dict(filter(lambda x: x[0] not in removekwargs, kwargs.items()))
         ax.plot(pDf.T, alpha=alpha, linewidth=linewidth, color=newc, zorder=1, **kwargs)
-        
-def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', figsize=(10,8), longWide='wide', noSort=False,
+
+
+def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', figsize=(10, 8), longWide='wide', noSort=False,
                 xs=None, queryConditionGroupNames=None, dataLabels=[], xlabels=[], xlabelRotation=0, saveFig=False):
-    
+
     # Filter clusters before calculating hash
     if isinstance(clusters, str):
         if clusters.lower() == "all":
@@ -2662,9 +2665,9 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
         else:
             raise ValueError(f'clusters needs to be either "all" or list of cluster numbers')
     else:
-        avaClusters = [] # list of lists
+        avaClusters = []  # list of lists
         for c in clusters:
-            #if isinstance(c, list | set | tuple): # for python >= 3.10
+            # if isinstance(c, list | set | tuple): # for python >= 3.10
             if isinstance(c, list) or isinstance(c, set) or isinstance(c, tuple):
                 c = sorted(list(set(clusterDf['cluster'].to_list()).intersection(set(c))))
                 if len(c) > 0:
@@ -2678,16 +2681,16 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
         cname = '_'.join(['.'.join([str(x) for x in c]) for c in clusters])
 
     ha = calHash(clusterDf, fname, dataDf, conditions, clusters, figsize, longWide, noSort,
-                xs, queryConditionGroupNames, dataLabels, xlabels, xlabelRotation)
+                 xs, queryConditionGroupNames, dataLabels, xlabels, xlabelRotation)
     fname = fname + '_cluster_' + cname + '_' + ha
 
     # Gather plot index
     clusterDataDict = OrderedDict()
     for cs in clusters:
-        ids = clusterDf[clusterDf['cluster']==cs[0]].index.to_list()
+        ids = clusterDf[clusterDf['cluster'] == cs[0]].index.to_list()
         if len(cs) > 1:
             for c in cs[1:]:
-                ids.extend(clusterDf[clusterDf['cluster']==c].index.to_list())
+                ids.extend(clusterDf[clusterDf['cluster'] == c].index.to_list())
         name = '.'.join([str(x) for x in cs])
         clusterDataDict[name] = ids
 
@@ -2698,7 +2701,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
     plt.close(fname)
     if isinstance(dataDf, type(None)):
         dataDf = clusterDf.loc[:, [c for c in clusterDf.columns if c != 'cluster']]
-    
+
     if isinstance(conditions, type(None)):
         conditions = dataDf.columns
     conditions = np.array(conditions)
@@ -2712,12 +2715,12 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
         queryConditionGroupNames = [list(range(x)) for x in conditions.shape]
     qshape = tuple(len(x) for x in queryConditionGroupNames)
     assert qshape == conditions.shape, f'{qshape}, {conditions.shape}'
-    
+
     nplots = len(clusters)
     nr, nc = calPlotShape(nplots, longWide)
     fig, axs = plt.subplots(nr, nc, num=fname, sharex=True, sharey=True,
                             constrained_layout=True, figsize=figsize)
-    
+
     if len(conditions) == 2:
         if len(xlabels) == 0:
             xlabels = [f'{a}-{b}' for a, b in zip(conditions[0], conditions[1])]
@@ -2728,7 +2731,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
             xlabels = conditions[0]
         if len(dataLabels) == 0:
             dataLabels = ['data']
-            
+
     plotted = dict(map(lambda x: [x, 0], axs.ravel()))
     for i, (ax, cname) in enumerate(zip(axs.ravel(), clusterDataDict)):
         index = clusterDataDict[cname]
@@ -2742,9 +2745,9 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
             pass
         if i == 0:
             ax.legend()
-        ax.annotate(f'cluster {cname}, n={len(index)}',(0,1.02), xycoords='axes fraction')
+        ax.annotate(f'cluster {cname}, n={len(index)}', (0, 1.02), xycoords='axes fraction')
         plotted[ax] = 1
-            
+
     if axs.ndim == 2:
         for a, axss in enumerate(reversed(axs)):
             for b, ax in enumerate(reversed(axss)):
@@ -2764,14 +2767,14 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
     for ax in axs.ravel():
         ax.xaxis.set_ticks(range(len(xlabels)))
         ax.xaxis.set_ticklabels(xlabels, rotation=xlabelRotation)
-    
+
     fig.suptitle(fname)
 
     figPath = 'Plots/Clustermap'
     os.makedirs(figPath, exist_ok=True)
     figFile = os.path.join(figPath, f'{fname}.svg')
     tabFile = os.path.join(figPath, f'{fname}.xlsx')
-    
+
     if saveFig:
         if os.path.isfile(figFile):
             logger.info(f'Cluster expression plot exists: {figFile}')
@@ -2782,7 +2785,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
             logger.info(f'Cluster ids table exists: {tabFile}')
         else:
             logger.info(f'Save cluster ids table at {tabFile}')
-            saveDataDf = pd.concat([pd.Series(sorted(y), name=x) for x,y in clusterDataDict.items()], axis=1)
+            saveDataDf = pd.concat([pd.Series(sorted(y), name=x) for x, y in clusterDataDict.items()], axis=1)
             saveDataDf.index = list(range(1, saveDataDf.shape[0]+1))
             saveDataDf.index.name = 'clusters->'
             saveDataDf.to_excel(tabFile)
@@ -2805,7 +2808,7 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
     plotType in ['bar', 'line fill', 'line bar'], to be added: 'line 2D', "bar 2D"
     """
     ha = calHash(meanDf, barDf, ids, conditions, figsize, title, ylims, xs,
-          plotType, queryConditionGroupNames, xlabels, xlabelRotation)
+                 plotType, queryConditionGroupNames, xlabels, xlabelRotation)
     if isinstance(ids, str):
         ids = [ids]
     fname = f'query_{plotType}_{title}_{"_".join([i for i in ids[:2]])}_{ha}'
@@ -2933,5 +2936,5 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
         saveBarDf = barDf
         saveBarDf.columns = [str(c)+'_bar' for c in barDf.columns]
         pd.concat((meanDf, saveBarDf), axis=1).to_excel(tabFile)
-    
+
     plt.show()
