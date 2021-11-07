@@ -2403,7 +2403,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
         for i, hls in enumerate(reversed(highlights)):
             c = next(defaultHighlightColours)
             hlDict[','.join(hls)[:16]] = c
-            zorders.loc[hls] = i + 1
+            zorders.loc[hls] = i + 2
             colours = changeColours(hls, colours, c)
     elif isinstance(highlights, dict) or isinstance(highlights, OrderedDict):
         # this dict should be 'name': [genes] or 'name': [color, [genes]]
@@ -2415,7 +2415,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
             except (IndexError, AssertionError):
                 c = next(defaultHighlightColours)
             hlDict[name] = c
-            zorders.loc[hls] = i + 1
+            zorders.loc[hls] = i + 2
             colours = changeColours(hls, colours, c)
 
     newidx = sorted(log2fc.index.tolist(), key=lambda x: zorders[x])
