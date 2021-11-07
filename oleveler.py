@@ -2374,7 +2374,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     hlDict = OrderedDict()  # 'name': color
     zorders = pd.Series(np.zeros(log2fc.shape), index=log2fc.index)
     zorders.loc[sigFilter] = 1
-    defaultHighlightColours = cycle([colors.to_rgba(f'C{i}') for i in range(1, 10)])
+    defaultHighlightColours = iter([colors.to_rgba(f'C{i}') for i in reversed(range(1, len(highlights)+1))])
 
     def changeColours(hls, colours, c):
         nonSigC = grayout(c)
