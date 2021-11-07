@@ -2485,7 +2485,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     if square:
         square_subplots(fig, ax)
 
-    ax.set_title(fname)
+    fig.suptitle(fname)
 
     figFile = filePath+'.svg'
     tabFile = filePath+'.xlsx'
