@@ -2912,8 +2912,9 @@ def query(meanDf, barDf, ids, conditions, cols=None, figsize=(6, 4), title='', y
     ax.set_xticklabels(meanDf.columns)
     if not isinstance(ylims, type(None)):
         ax.set_ylims(ylims)
-    ax.legend()
-    figtitle = f'Protein group{"s" if len(realIds) > 1 else ""} expression profile'
+    if len(realIds) > 1:
+        ax.legend()
+    figtitle = f'Expression profile'
     figtitle += (f'\n{title}' if title != "" else "")
     ax.set_title(figtitle)
     if len(xlabels) != 0:
