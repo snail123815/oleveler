@@ -2882,11 +2882,18 @@ def query(meanDf, barDf, ids, conditions, cols=None, figsize=(6, 4), title='', y
     if plotType == 'bar':
         # make sure there is always a factor (ids or groups) that is 1 dimention
         width = 0.35
+        try:
+            width = kwargs['width']
+            kwargs.pop('width')
+        except:
+            pass
         singleBar = 2*width/meanDf.shape[0]
         for i, ind in enumerate(meanDf.index):
             #             print(meanDf)
             ax.bar(xs-width+i*singleBar, meanDf.loc[ind, :], label=ind,
                    yerr=barDf.loc[ind, :], width=singleBar, align='edge', **kwargs)
+        xticks = ax.get_xticks()
+        ax.set_xlim((xticks[0], xticks[-1]))
     elif plotType.startswith('line'):
         for i, ind in enumerate(meanDf.index):
             y = meanDf.loc[ind, :]
