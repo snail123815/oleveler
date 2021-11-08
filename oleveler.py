@@ -2792,7 +2792,7 @@ def plotCluster(clusterDf, fname, dataDf=None, conditions=None, clusters='all', 
 # Query subset
 
 
-def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, xs=None,
+def query(meanDf, barDf, ids, conditions, cols=None, figsize=(6, 4), title='', ylims=None, xs=None,
           plotType='bar', queryConditionGroupNames=None, xlabels=[], xlabelRotation=0):
     # TODO add plot type to the figure name
     """
@@ -2803,7 +2803,7 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
              ['WT_20',   'WT_24',   'WT_26',   'WT_45'  ]]
     plotType in ['bar', 'line fill', 'line bar'], to be added: 'line 2D', "bar 2D"
     """
-    ha = calHash(meanDf, barDf, ids, conditions, figsize, title, ylims, xs,
+    ha = calHash(meanDf, barDf, ids, conditions, cols, figsize, title, ylims, xs,
                  plotType, queryConditionGroupNames, xlabels, xlabelRotation)
     if isinstance(ids, str):
         ids = [ids]
@@ -2812,6 +2812,9 @@ def query(meanDf, barDf, ids, conditions, figsize=(6, 4), title='', ylims=None, 
         fname = fname.replace('__', '_')
     logger.info(f'Query with name: {fname}')
     plt.close(fname)
+    if not isinstance(cols, type(None)):
+        meanDf = meanDf.loc[:, cols]
+        barDf = barDf.loc[:, cols]
     # Normalise meanDf,
     Scaler = MinMaxScaler((0, 100))  # linear scaler
     Scaler.fit(meanDf)
