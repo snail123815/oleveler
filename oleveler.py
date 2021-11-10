@@ -2383,7 +2383,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
         colours.loc[sf] = [c] * len(sf)
         colours.loc[nsf] = [nonSigC] * len(nsf)
         return colours
-
+    
     if isinstance(highlights, list):
         if not isinstance(highlights[0], list):
             highlights = [highlights]
@@ -2424,16 +2424,6 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     colours = colours[newidx]
     pointSizes = pointSizes[newidx]
 
-    labels = [n for n in reversed(hlDict)]
-    legends = [(plt.scatter([], [], marker='o', color=hlDict[n]),
-                plt.scatter([], [], marker='o', color=grayout(hlDict[n]))) for n in reversed(hlDict)]
-    if len(legends) > 0:
-        legends += [Line2D([0], [0], marker='o', linewidth=0, color='k', markersize=0)]
-        labels += ['']
-    legends += [(plt.scatter([], [], marker='o', color=sigColor),
-                 plt.scatter([], [], marker='o', color=baseColor))]
-    labels += ['Other genes']
-
     fig, ax = plt.subplots(1, 1, figsize=figsize, num=fname)
     sc = ax.scatter(log2fc, procPval,
                     s=pointSizes, c=colours)
@@ -2448,6 +2438,17 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     ax.axvline(lfcThresh,  c=lineColor, linestyle='--', linewidth=0.3)
     ax.set_xlabel(r'$log_2$(fold change)')
     ax.set_ylabel(r'$-log_{10}$(adjusted P-value)')
+
+    labels = [n for n in reversed(hlDict)]
+    legends = [(plt.scatter([], [], marker='o', color=hlDict[n]),
+                plt.scatter([], [], marker='o', color=grayout(hlDict[n]))) for n in reversed(hlDict)]
+    if len(legends) > 0:
+        legends += [Line2D([0], [0], marker='o', linewidth=0, color='k', markersize=0)]
+        labels += ['']
+    legends += [(plt.scatter([], [], marker='o', color=sigColor),
+                 plt.scatter([], [], marker='o', color=baseColor))]
+    labels += ['Other genes']
+
     ax.legend(legends, labels, scatterpoints=1,
               numpoints=1, handler_map={tuple: HandlerTuple(ndivide=None)})
 
