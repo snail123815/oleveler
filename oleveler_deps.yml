@@ -1,0 +1,26 @@
+name: oleveler
+channels:
+  - conda-forge
+  - bioconda
+  - r
+dependencies:
+  - numpy
+  - pandas
+  - scipy
+  - r-base
+  - rpy2
+  - matplotlib
+  - scikit-learn
+  - openpyxl
+  - jupyterlab
+  - biopython
+  - nodejs
+  - ipympl
+  - seaborn
+  - pip:
+    - bcbio-gff
+    - jupyterthemes
+  - r-biocmanager
+  - bioconductor-deseq2
+  - bioconductor-msstats
+  - bioconductor-apeglm
