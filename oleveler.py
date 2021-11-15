@@ -848,6 +848,10 @@ def deseq2Process(
         logger.info(pathVst)
         logger.info('####### END Processing data using DESeq2 #######')
         vstDf = pd.read_csv(pathVst, sep='\t', header=0, index_col=0)
+        # sort columns for the result.
+        vstDf = vstDf.loc[:, sorted(vstDf.columns)]
+        vstDf.to_csv(pathVst, sep='\t')
+        vstDf = pd.read_csv(pathVst, sep='\t', header=0, index_col=0)
         return vstDf
 
 
