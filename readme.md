@@ -1,8 +1,8 @@
 # Omics-leveler
 
-by Du, Chao (杜超), PhD.
-Institute of Biology Leiden, Leiden University, the Netherlands
-c.du@biology.leidenuniv.nl
+by [Du, Chao (杜超), PhD.](https://www.universiteitleiden.nl/en/staffmembers/chao-du)  
+[Institute of Biology](https://www.universiteitleiden.nl/en/science/biology), Leiden University, the Netherlands  
+c.du@biology.leidenuniv.nl  
 durand[dot]dc[at]hot[no space]mail.com
 
 For you to analyse quantitative proteomics and transcriptiomics data at ease!
