@@ -1,18 +1,37 @@
-# Oleveler
+# Omics-leveler
 
-Title for Omics-leveler. Seems to deal with all omics data? No, only quantitive proteomics and transcriptomics.
+For you to analysis quantitative proteomics and transcriptiomics data at ease!
 
-The functions are desigend to be (mostly) directly callable from within jupyter notebook when imported as:
+**Oleveler** is short for **Omics-leveler**, it only requires very basic python knowledge to work with. The analysis starts with MaxQuant result (proteomics) or `featureCount` (transcriptomics) result, do the right statistics with ease, generate customised plots including PCA, PLS, volcano, bar, etc. More importantly, this tool is designed to give you the ability to query the dataset at any time that you come up with any brilliant idea!
+
+- [1. Introduction](#1-introduction)
+- [2. Install Dependencies](#2-install-dependencies)
+- [3. Prepare your data - Example folder `my_analysis`](#3-prepare-your-data-example-folder-my_analysis)
+	- [3.1 Proteomics data](#31-proteomics-data)
+		- [3.1.1 Edit `Annotation.csv`](#311-edit-annotationcsv)
+		- [3.1.2 Edit `comparisons.xlsx`](#312-edit-comparisonsxlsx)
+	- [3.2 Transcriptomics data](#32-transcriptomics-data)
+		- [3.2.1 Edit `Annotation.csv`](#321-edit-annotationcsv)
+		- [3.2.2 Edit `comparisons.xlsx`](#322-edit-comparisonsxlsx)
+- [4. Start analysing](#4-start-analysing)
+- [5. Known Issues](#5-known-issues)
+- [6. References](#6-references)
+
+## 1. Introduction
+
+Thanks to the advancement in both technologies, quantitative proteomics and transcriptomics are applied more often in biology research. Scientists are generating huge amount of data that may include more samples or/and more complex experiment designs. This posses a great problem in data analyses. Often, a specialist in proteomics or a bioinfomaticion analysing transcriptomics data are taking a lot of efforts in understanding the scientific question behind the experiment design. This process includes numerous communication between specialists and biologists. It is very time consuming and may leads to disastrous mis-understanding. **Oleveler** is born to solve this "last kilometre" problem by giving the ease and flexibility in data analysis to biologists. 
+
+Processing raw LC-MS/MS files or raw reads files are not within the scope of this tool. For a typical biologist, I strongly suggest that you leave that part to a specialist.
+
+**Oleveler** is provided as a one file system intended to minimise the chance of operational errors. As it is built for [jupyternotebook or jupyterlab](https://jupyter.org), bioinformaticions can also use **Oleveler** to build a [JupyterHub](https://jupyterhub.readthedocs.io/en/latest) that deliver the power of data analysis to end users without installing dependencies on end users' computer.
+
+Current design code of this program is to make sure every function, except data-loading functions, can be called independently, with all information passed in as parameters.
 
 ```python
 from oleveler import *
 ```
 
-(Thus one file)
-
-Tested in jupyter lab only.
-
-## 1. Install Dependencies
+## 2. Install Dependencies
 
 Create a conda environment for **oleveler** is recommanded. [**Mamba**](https://github.com/mamba-org/mamba) is recommanded to install dependencies because it is much faster and reliable than **conda** itself. To install **Mamba** in your conda environment:
 
@@ -41,11 +60,11 @@ Before running your analysis, do not forget to activate the environment you just
 mamba activate oleveler
 ```
 
-## 2. Prepare your data - Example folder `my_analysis`
+## 3. **Prepare** your data - Example folder `my_analysis`
 
 The analysis needs to start with a fresh (empty) folder. Assume the folder is named `my_analysis`. Please **copy** the `oleveler.py` file from this repository (or download it using the download )
 
-### 2.1 Proteomics data
+### 3.1 Proteomics data
 
 Oleveler starts with [MaxQuant](https://maxquant.org) processed data. From the analysis folder `combined/txt/`, please copy the following two files:
 
@@ -54,7 +73,7 @@ Oleveler starts with [MaxQuant](https://maxquant.org) processed data. From the a
 
 Create a folder named **`MaxQuant_output`** in `my_analysis` folder, put the above files in that folder.
 
-#### 2.1.1 Edit `Annotation.csv`
+#### 3.1.1 Edit `Annotation.csv`
 
 Copy `Annotation_proteomics_example.csv` from this project, put it directly in `my_analysis` folder and rename it as `Annotation.csv`.
 
@@ -69,7 +88,7 @@ There are four columns in this file: `Raw.file`, `Condition`, `BioReplicate`, `E
 
 This file will be used in **MSstats**<sup>[2][2]</sup> so it should comply with its [rules](https://msstats.org/wp-content/uploads/2020/02/MSstats_v3.18.1_manual_2020Feb26-v2.pdf). Although it is possible to use data with multiple runs per sample (eg. samples that fractionised before LC-MS/MS runs), but that have not been tested in **Oleveler**.
 
-#### 2.1.2 Edit `comparisons.xlsx`
+#### 3.1.2 Edit `comparisons.xlsx`
 
 This file is to provide enough information for the program to do "different analysis" to see which proteins are changed in different conditions, the condition of experiment and corresponding control needs to be specified.
 
@@ -83,13 +102,13 @@ There are three columns in this file: `id`, `exp`, `ctr`
 
 The different analysis will show the 'log<sub>2</sub> fold changes' (LFCs) of `exp` divided by `ctr`. When zero is encountered in this comparision, result will show as `inf` for 'divided by zero' conditions, `-inf` for zero devide positive number conditons, otherwise `nan` for 'not a number'.
 
-### 2.2 Transcriptomics data
+### 3.2 Transcriptomics data
 
 Oleveler starts with feature counts (usually it is read counts for each gene) files. These files usually are genereated by [**featureCounts**](http://subread.sourceforge.net). ([**Salmon**](https://combine-lab.github.io/salmon/) support is on the way)
 
 Create a folder named **`quantResult`** in `my_analysis` folder, put read counts files for all samples in this folder.
 
-#### 2.2.1 Edit `Annotation.csv`
+#### 3.2.1 Edit `Annotation.csv`
 
 Copy `Annotation_example.csv` from this project, put it directly in `my_analysis` folder and rename it as `Annotation.csv`.
 
@@ -103,7 +122,7 @@ There are four columns in this file: `Raw.file`, `Condition`, `BioReplicate`, `E
 `BioReplicate` - fill in a number of the bio-replicate within one condition. Eg. 'D24_1', 'D24_2', and 'D24_3' are samples from the same condition, then give them numbering '1', '2', and '3' in this column. Orders do not matter.  
 `Experiment` - fill in the experiment name of the raw file belongs. Each should contain both condition and bio-replicate information. **Contents of this column needs to be unique.**
 
-#### 2.2.2 Edit `comparisons.xlsx`
+#### 3.2.2 Edit `comparisons.xlsx`
 
 This file is to provide enough information for the program to do "different analysis" to see which genes are changed in different conditions, the condition of experiment and corresponding control needs to be specified.
 
@@ -117,8 +136,13 @@ There are three columns in this file: `id`, `exp`, `ctr`
 
 The different analysis will show the 'log<sub>2</sub> fold changes' (LFCs) of `exp` divided by `ctr`. When zero is encountered in this comparision, result will show as `inf` for 'divided by zero' conditions, `-inf` for zero devide positive number conditons, otherwise `nan` for 'not a number'.
 
-## 3. TODO:
+## 4. Start analysing
 
+Have fun.
+
+## 5. Known Issues
+
+[under construction]
 - [x] Close temp files opened due to required compatibility to windows
 - [x] \*DESeq2 will die when too many comparisons will run in the same R kernel. This often happens because each comparison consume to much memory and thus leads to memory surge or other problem. Solved by removing tempfiles etc.
 - [x] Add queryLfc()
@@ -127,7 +151,7 @@ The different analysis will show the 'log<sub>2</sub> fold changes' (LFCs) of `e
 - [ ] Pack related functions
 - [x] Add references list
 
-## 4. References
+## 6. References
 
 1. Love, M.I., Huber, W. & Anders, S. Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biol 15, 550 (2014)
 
