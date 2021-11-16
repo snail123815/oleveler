@@ -1,12 +1,17 @@
 # Omics-leveler
 
-For you to analysis quantitative proteomics and transcriptiomics data at ease!
+by Du, Chao (杜超), PhD.
+Institute of Biology Leiden, Leiden University, the Netherlands
+c.du@biology.leidenuniv.nl
+durand[dot]dc[at]hot[no space]mail.com
+
+For you to analyse quantitative proteomics and transcriptiomics data at ease!
 
 **Oleveler** is short for **Omics-leveler**, it only requires very basic python knowledge to work with. The analysis starts with MaxQuant result (proteomics) or `featureCount` (transcriptomics) result, do the right statistics with ease, generate customised plots including PCA, PLS, volcano, bar, etc. More importantly, this tool is designed to give you the ability to query the dataset at any time that you come up with any brilliant idea!
 
 - [1. Introduction](#1-introduction)
 - [2. Install Dependencies](#2-install-dependencies)
-- [3. Prepare your data - Example folder `my_analysis`](#3-prepare-your-data-example-folder-my_analysis)
+- [3. **Prepare** your data - Example folder `my_analysis`](#3-prepare-your-data---example-folder-my_analysis)
 	- [3.1 Proteomics data](#31-proteomics-data)
 		- [3.1.1 Edit `Annotation.csv`](#311-edit-annotationcsv)
 		- [3.1.2 Edit `comparisons.xlsx`](#312-edit-comparisonsxlsx)
@@ -23,9 +28,11 @@ Thanks to the advancement in both technologies, quantitative proteomics and tran
 
 Processing raw LC-MS/MS files or raw reads files are not within the scope of this tool. For a typical biologist, I strongly suggest that you leave that part to a specialist.
 
+Statistics, eg. data transformation, calculation of log<sub>2</sub> fold change and corresponding *p*-values, are done by running R code inside **Oleveler** using **DESeq2**<sup>[2][2]</sup> (both proteomics and transcriptomics data) and **MSstats**<sup>[3][3]</sup>. You need to reference them if you do the different analysis inside **Oleveler**. Also, please reference **apeglm**<sup>[1][1]</sup> if you used *shrinked* data for plotting etc.
+
 **Oleveler** is provided as a one file system intended to minimise the chance of operational errors. As it is built for [jupyternotebook or jupyterlab](https://jupyter.org), bioinformaticions can also use **Oleveler** to build a [JupyterHub](https://jupyterhub.readthedocs.io/en/latest) that deliver the power of data analysis to end users without installing dependencies on end users' computer.
 
-Current design code of this program is to make sure every function, except data-loading functions, can be called independently, with all information passed in as parameters.
+Current design code of this program is to make sure every function can be called independently, with all information passed in as parameters.
 
 ```python
 from oleveler import *
