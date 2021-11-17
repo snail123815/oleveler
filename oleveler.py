@@ -2616,6 +2616,7 @@ def plotHeatmapGetCluster(
     cluster = pd.concat((data2d, cluster), axis=1)
     # Save figure and data
     if plot and saveFig:
+        plt.show()
         figPath = 'Plots/Clustermap'
         figFile = os.path.join(figPath, fname+'.svg')
         tabFile = os.path.join(figPath, fname+'.xlsx')
