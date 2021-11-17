@@ -1,0 +1,13 @@
+Raw.file,Condition,BioReplicate,Experiment
+D24_1,Dgbn_24,1,D24_1
+D24_2,Dgbn_24,2,D24_2
+D24_3,Dgbn_24,3,D24_3
+C24_1,WT_24,1,C24_1
+C24_2,WT_24,2,C24_2
+C24_3,WT_24,3,C24_3
+D45_1,Dgbn_45,1,D45_1
+D45_2,Dgbn_45,2,D45_2
+D45_3,Dgbn_45,3,D45_3
+C45_1,WT_45,1,C45_1
+C45_2,WT_45,2,C45_2
+C45_3,WT_45,3,C45_3
