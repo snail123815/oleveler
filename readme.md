@@ -30,7 +30,7 @@ Thanks to the advancement in both technologies, quantitative proteomics and tran
 
 Processing raw LC-MS/MS files or raw reads files are not within the scope of this tool. For a typical biologist, I strongly suggest that you leave that part to a specialist.
 
-Statistics, eg. data transformation, calculation of log<sub>2</sub> fold change and corresponding *p*-values, are done by running R code inside **Oleveler** using **DESeq2**<sup>[2][2]</sup> (both proteomics and transcriptomics data) and **MSstats**<sup>[3][3]</sup>. You need to reference them if you do the different analysis inside **Oleveler**. Also, please reference **apeglm**<sup>[1][1]</sup> if you used *shrinked* data for plotting etc.
+Statistics, eg. data transformation, calculation of log<sub>2</sub> fold change and corresponding *p*-values, are done by running R code inside **Oleveler** using **DESeq2**<sup>[1][1]</sup> (both proteomics and transcriptomics data) and **MSstats**<sup>[2][2]</sup>. You need to reference them if you do the different analysis inside **Oleveler**. Also, please reference **apeglm**<sup>[3][3]</sup> if you used *shrinked* data for plotting etc.
 
 **Oleveler** is provided as a one file system intended to minimise the chance of operational errors. As it is built for [jupyternotebook or jupyterlab](https://jupyter.org), bioinformaticions can also use **Oleveler** to build a [JupyterHub](https://jupyterhub.readthedocs.io/en/latest) that deliver the power of data analysis to end users without installing dependencies on end users' computer.
 
