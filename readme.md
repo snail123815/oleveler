@@ -1,6 +1,8 @@
 # Omics-leveler
 
 by [Du, Chao (杜超), PhD.](https://www.universiteitleiden.nl/en/staffmembers/chao-du)  
+
+Member of MBT group of Microbio Science led by [Prof.dr. G.P. van Wezel](https://www.universiteitleiden.nl/en/staffmembers/gilles-van-wezel#tab-1)  
 [Institute of Biology](https://www.universiteitleiden.nl/en/science/biology), Leiden University, the Netherlands  
 c.du@biology.leidenuniv.nl  
 durand[dot]dc[at]hot[no space]mail.com
