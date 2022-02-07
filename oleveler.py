@@ -3,7 +3,7 @@
 # Institute of Biology Leiden
 # Leiden University
 # c.du@biology.leidenuniv.nl
-# durand[dot]dc[at]hot[no space]mail.com
+# durand[dot]dc[at]hotma[no space]il.com
 ############################################
 
 from jupyterthemes import jtplot
@@ -220,24 +220,7 @@ def loadMQLfqData(dataPath, minLfq=3):
         lfqDf = proteinGroupsDf[lfqCols]
         # Remove 'LFQ intensity ' from column names
         lfqDf.columns = lfqDf.columns.to_series().str.replace('LFQ intensity ', '')
-        nProtGroupsAll = lfqDf.shape[0]
-        logger.info(f'{nProtGroupsAll} protein groups in MQ output, including LFQ zeros.')
-        # Reduce numbers by 1000
-        logger.info('Reduce numbers by 1000')
-        lfqDf = lfqDf / 1000
-        # Make all numbers as int type for DESeq2
-        logger.info('Make all numbers as int type for DESeq2')
-        lfqDf = lfqDf.astype('int')
-        # Replace 0 with NA
-        logger.info('Replace 0 with NA')
-        lfqDf = lfqDf.replace(0, np.nan)
-        # remove all zeros and < minLfq quantifications
-        logger.info(f'Remove < {minLfq} quantifications')
-        lfqDf = lfqDf[(~lfqDf.isna()).sum(axis=1) >= minLfq]
-        nProtGroups = lfqDf.shape[0]
-        logger.info(f'Removed {nProtGroupsAll - nProtGroups} protein groups, now {nProtGroups}.')
-        # Add id column to lfqDf
-        logger.info('Add id column to lfqDf ')
+        lfqDf = processMQLFQ(lfqDf, minLfq)
         # Write out table
         logger.info(f'Write out table {lfqTableOut}')
         lfqDf.to_csv(lfqTableOut, sep='\t')
@@ -245,6 +228,27 @@ def loadMQLfqData(dataPath, minLfq=3):
             pickle.dump([lfqDf, id2group], f)
     logger.info("####### END MaxQuant LFQ data input #######\n")
     return lfqDf, id2group
+
+def processMQLFQ(lfqDf, minLfq=3):
+    lfqDf = lfqDf.copy()
+    nProtGroupsAll = lfqDf.shape[0]
+    logger.info(f'{nProtGroupsAll} protein groups in MQ output, including LFQ zeros.')
+    # Reduce numbers by 1000
+    logger.info('Reduce numbers by 1000')
+    lfqDf = lfqDf.replace(np.nan, 0)
+    lfqDf = lfqDf / 1000
+    # Make all numbers as int type for DESeq2
+    logger.info('Make all numbers as int type for DESeq2')
+    lfqDf = lfqDf.astype('int')
+    # Replace 0 with NA
+    logger.info('Replace 0 with NA')
+    lfqDf = lfqDf.replace(0, np.nan)
+    # remove all zeros and < minLfq quantifications
+    logger.info(f'Remove < {minLfq} quantifications')
+    lfqDf = lfqDf[(~lfqDf.isna()).sum(axis=1) >= minLfq]
+    nProtGroups = lfqDf.shape[0]
+    logger.info(f'Removed {nProtGroupsAll - nProtGroups} protein groups, now {nProtGroups}.')
+    return lfqDf
 
 
 def loadMeta(path, toRemove=[]):
@@ -668,6 +672,8 @@ def getStats(dataDf, experiments, title=''):
     # calculate hash for parameters
     ha = calHash(dataDf, experiments)  # skipping title for now
 
+    os.makedirs('dataTables', exist_ok=True)
+
     meanTbFile = f'dataTables/mean_{title}_{ha}.tsv'.replace('__', '_')
     nquantTbFile = f'dataTables/nquant_{title}_{ha}.tsv'.replace('__', '_')
     varTbFile = f'dataTables/var_{title}_{ha}.tsv'.replace('__', '_')
@@ -837,9 +843,24 @@ def deseq2Process(
         return design
     else:
         logger.info('Performing VST')
+
+        # Calculate nsub for vst
+        robjects.r(
+            """
+            nsub <- 1000
+            baseMean <- rowMeans(counts(dds, normalized=TRUE))
+            max_nsub <- sum(baseMean > 5) 
+            if (max_nsub < 1000) {
+                nsub <- max_nsub
+                print("Less than 1000 rows with mean normalized count > 5.")
+                print(nsub)
+            }
+            """
+        )
+
         robjects.r(
             f"""
-            vsd = vst(dds, blind=FALSE)
+            vsd = vst(dds, nsub=nsub, blind=FALSE)
             write.table(assay(vsd), file='{pathVst}', sep='\t', col.names=NA)
             rm(vsd)
             gc()
