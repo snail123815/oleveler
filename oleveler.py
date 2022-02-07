@@ -2978,3 +2978,113 @@ def query(meanDf, barDf, ids, conditions, cols=None, figsize=(6, 4), title='', y
         pd.concat((meanDf, saveBarDf), axis=1).to_excel(tabFile)
 
     plt.show()
+
+def plotHeatmap(
+    df, index=None, cols=None, ylabels=None, xlabels='ALL', title='',
+    standard_scale=None,
+    plot=True, saveFig=False
+):
+    """[summary]
+
+    Args:
+        plotDf ([type]): [description]
+        index ([type], optional): [description]. Defaults to None.
+        cols ([type], optional): [description]. Defaults to None.
+        ylabels ([type], optional): [description]. Defaults to None.
+        xlabels (str, optional): [description]. Defaults to 'ALL'.
+        title (str, optional): [description]. Defaults to ''.
+        plot (bool, optional): [description]. Defaults to True.
+        saveFig (bool, optional): [description]. Defaults to False.
+        standard_scale = [None, 'row', 'col']
+
+    Returns:
+        [type]: [description]
+    """
+    # Filter data, order columns
+    if isinstance(index, type(None)):
+        index = df.index
+    else:
+        # only keep existing ones
+        inputIdxLen = len(index)
+        index = [idx for idx in index if idx in df.index]
+        if len(index) < inputIdxLen:
+            print('Some items from input index are dropped.')
+    if isinstance(cols, type(None)):
+        cols = df.columns
+    plotDf = df.loc[index, cols]
+    # hash para
+    ha = calHash(plotDf, index, cols, ylabels, xlabels, title, standard_scale)
+
+    if isinstance(standard_scale, type(None)):
+        pass
+    elif standard_scale.lower() == 'row':
+        standard_scale = 0
+    elif standard_scale.lower() == 'col':
+        standard_scale = 1
+
+    fname = f'Simple_Heatmap_{title}_{ha}'
+    while '__' in fname:
+        fname = fname.replace('__', '_')
+    plt.close(fname)
+    # plot to get cluster info only
+    cg = sns.clustermap(plotDf,
+                        standard_scale=standard_scale,
+                        col_cluster=False, row_cluster=False)
+
+    cg.fig.set_label(fname)
+    newgs = gridspec.GridSpec(ncols=4, nrows=3, top=0.95,
+                              width_ratios=[0.02, 0.83, 0.12, 0.03],
+                              height_ratios=[0.3, 0.2, 0.5],
+                              figure=cg.fig)
+    cg.ax_heatmap.set_subplotspec(newgs[:, 1])
+    cg.cax.set_subplotspec(newgs[1, 3])
+    # Transformed data
+    data2d = cg.data2d
+    # Set x and y tick labels
+    if isinstance(ylabels, type(None)):
+        cg.ax_heatmap.set_yticklabels([])
+        cg.ax_heatmap.set_yticks([])
+        cg.ax_heatmap.set_ylabel('')
+    elif ylabels == 'AUTO':
+        pass
+    else:
+        if ylabels == 'ALL':
+            ylabels = data2d.index
+        assert len(ylabels) == data2d.shape[0], f'ylabels needs to have {data2d.shape[0]} elements'
+        cg.ax_heatmap.set_yticks(np.linspace(0.5, data2d.shape[0]-0.5, data2d.shape[0]))
+        cg.ax_heatmap.set_yticklabels(ylabels)
+    if isinstance(xlabels, type(None)):
+        cg.ax_heatmap.set_xticklabels([])
+        cg.ax_heatmap.set_xticks([])
+        cg.ax_heatmap.set_xlabel('')
+    elif xlabels == 'AUTO':
+        pass
+    else:
+        if xlabels == 'ALL':
+            xlabels = data2d.columns
+        assert len(xlabels) == data2d.shape[1], f'xlabels needs to have {data2d.shape[1]} elements'
+        cg.ax_heatmap.set_xticks(np.linspace(0.5, data2d.shape[1]-0.5, data2d.shape[1]))
+        cg.ax_heatmap.set_xticklabels(xlabels)
+
+    # Output data
+    # Save figure and data
+    if plot and saveFig:
+        plt.show()
+        figPath = 'Plots/Simple_heatmap'
+        figFile = os.path.join(figPath, fname+'.svg')
+        tabFile = os.path.join(figPath, fname+'.xlsx')
+        os.makedirs(figPath, exist_ok=True)
+        if os.path.isfile(figFile):
+            logger.info(f'Heatmap plot exists: {figFile}')
+        else:
+            logger.info(f'Save Heatmap plot at {figFile}')
+            cg.savefig(figFile)
+        if os.path.isfile(tabFile):
+            logger.info(f'Heatmap data exists: {figFile}')
+        else:
+            logger.info(f'Save Heatmap data at {tabFile}')
+            data2d.to_excel(tabFile)
+    elif plot:
+        plt.show()
+    else:
+        plt.close(fname)
