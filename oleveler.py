@@ -8,6 +8,7 @@
 
 from jupyterthemes import jtplot
 from scipy.cluster.hierarchy import fcluster
+from scipy.stats import mannwhitneyu
 from sklearn.covariance import EllipticEnvelope
 from sklearn.svm import OneClassSVM
 from sklearn.neighbors import LocalOutlierFactor
@@ -25,6 +26,7 @@ from matplotlib.lines import Line2D
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from matplotlib import cm, colors
+from matplotlib import ticker as mticker
 from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects.packages as rpackages
 import rpy2.robjects as robjects
@@ -47,6 +49,8 @@ import sys
 import logging
 import pickle
 import os
+import itertools
+
 olevelerVersion = 1.0
 infoText = f'''
 Oleveler - omics data analysis tools for jupyter notebook
@@ -2412,22 +2416,16 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     if isinstance(highlights, list):
         if not isinstance(highlights[0], list):
             highlights = [highlights]
-        # Check list and keep only correct ones
-        nhls = []
-        for hls in highlights:
-            nls = []
-            for i in hls:
-                if i in log2fc.index:
-                    nls.append(i)
-                else:
-                    logger.warning(f'{i} do not have valid corresponding data, ignored')
-            if len(nls) > 0:
-                nhls.append(nls)
-        highlights = nhls
-
         for i, hls in enumerate(reversed(highlights)):
             c = next(defaultHighlightColours)
-            hlDict[','.join(hls)[:16]] = c
+            nhls = set(hls).intersection(set(commonIds))
+            if len(hls) > len(nhls):
+                nhls = sorted(list(nhls))
+                [logger.warning(f'{i} do not have valid corresponding data, ignored') \
+                        for i in nhls]
+                hls = nhls
+            name = ','.join(hls)[:16] + calHash(hls) # make sure it is unique
+            hlDict[name] = c
             zorders.loc[hls] = i + 2
             colours = changeColours(hls, colours, c)
     elif isinstance(highlights, dict) or isinstance(highlights, OrderedDict):
@@ -2440,6 +2438,12 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
             except (IndexError, AssertionError):
                 c = next(defaultHighlightColours)
             hlDict[name] = c
+            nhls = set(hls).intersection(set(commonIds))
+            if len(hls) > len(nhls):
+                nhls = sorted(list(nhls))
+                [logger.warning(f'{i} do not have valid corresponding data, ignored') \
+                        for i in nhls]
+                hls = nhls
             zorders.loc[hls] = i + 2
             colours = changeColours(hls, colours, c)
 
@@ -3000,18 +3004,8 @@ def plotHeatmap(
     Returns:
         [type]: [description]
     """
-    # Filter data, order columns
-    if isinstance(index, type(None)):
-        index = df.index
-    else:
-        # only keep existing ones
-        inputIdxLen = len(index)
-        index = [idx for idx in index if idx in df.index]
-        if len(index) < inputIdxLen:
-            print('Some items from input index are dropped.')
-    if isinstance(cols, type(None)):
-        cols = df.columns
-    plotDf = df.loc[index, cols]
+    # Filter data, order columns base on input
+    plotDf = subsetDf(df, index, cols)
     # hash para
     ha = calHash(plotDf, index, cols, ylabels, xlabels, title, standard_scale)
 
@@ -3088,3 +3082,87 @@ def plotHeatmap(
         plt.show()
     else:
         plt.close(fname)
+
+def subsetDf(df, index, cols):
+    if isinstance(index, type(None)):
+        index = df.index
+    else:
+        inputIdxLen = len(index)
+        index = [idx for idx in index if idx in df.index]
+        if len(index) < inputIdxLen:
+            logger.info('Some items from input index are dropped.')
+            logger.info(f'There are {len(index)} valid out of {inputIdxLen}')
+    if isinstance(cols, type(None)):
+        cols = df.columns
+    else:
+        inputColLen = len(cols)
+        cols = [c for c in cols if c in df.columns]
+        if len(cols) < inputColLen:
+            logger.info('Some items from input columns are dropped.')
+    return df.loc[index, cols]
+
+
+def plotBoxVioMultigene(df, index=None, cols=None,
+                        title='',
+                        figsize=(10,7)):
+    plotDf = subsetDf(df, index, cols)
+    ha = calHash(plotDf, title, figsize)
+    fname = f'box-violin_plot_{title}_{ha}'.replace(" ", "_").replace('__', "_")
+    plt.close(fname)
+    fig, axs = plt.subplots(1,2,figsize=figsize, num=fname)
+    plotDf = np.log10(plotDf)
+    logger.info('Test results')
+
+    statComb = itertools.combinations(plotDf.columns, 2)
+
+    # stat
+    # TODO add stat to figure automatically
+    # https://levelup.gitconnected.com/statistics-on-seaborn-plots-with-statannotations-2bfce0394c00
+    # https://github.com/trevismd/statannotations-tutorials
+    statResults = {}
+    for a, b in statComb:
+        statResults[f'{a} vs. {b}'] = [
+            a, b,
+            mannwhitneyu(plotDf[a].dropna(), plotDf[b].dropna())
+        ]
+    for k, item in statResults.items():
+        logger.info(f'{k}: pvalue={item[2].pvalue:.5f}')
+    
+    ylogmax = int(np.ceil(plotDf.max().max()))
+    ylogmin = int(np.floor(plotDf.min().min()))
+    sns.boxplot(data=plotDf, ax=axs[0], width=0.35, )
+    sns.violinplot(data=plotDf, ax=axs[1], width=0.4, cut=3)
+    sns.swarmplot(data=plotDf, ax=axs[1], edgecolor='k', linewidth=0.4)
+    #sns.stripplot(data=plotDf, ax=ax, edgecolor='k', linewidth=0.4)
+    axs[0].yaxis.set_ticks(range(ylogmin, ylogmax+1))
+    axs[0].yaxis.set_major_formatter(mticker.StrMethodFormatter('$10^{{{x:.0f}}}$'))
+    axs[0].yaxis.set_ticks(
+        [np.log10(x) for p in range(ylogmin, ylogmax) for x in np.linspace(10**p, 10**(p+1), 10)],
+        minor=True
+    )
+    ylogmax += 1
+    ylogmin -= 1
+    axs[1].yaxis.set_ticks(range(ylogmin, ylogmax+1))
+    axs[1].yaxis.set_major_formatter(mticker.StrMethodFormatter('$10^{{{x:.0f}}}$'))
+    axs[1].yaxis.set_ticks(
+        [np.log10(x) for p in range(ylogmin, ylogmax) for x in np.linspace(10**p, 10**(p+1), 10)],
+        minor=True
+    )
+    fig.suptitle(title)
+    plt.show()
+    figpath = 'Plots/boxvioPlots'
+    os.makedirs(figpath, exist_ok=True)
+    figfile = os.path.join(figpath, fname+'.svg')
+    figdata = os.path.join(figpath, fname+'.xlsx')
+    figtest = os.path.join(figpath, fname+'.txt')
+    logger.info(figfile)
+    if not os.path.isfile(figfile):
+        fig.savefig(figfile)
+    logger.info(figdata)
+    if not os.path.isfile(figdata):
+        plotDf.to_excel(figdata)
+    logger.info(figtest)
+    if not os.path.isfile(figtest):
+        with open(figtest, 'w') as tf:
+            for k, item in statResults.items():
+                tf.write(f'{k}: pvalue={item[2].pvalue:.5f}\n')
