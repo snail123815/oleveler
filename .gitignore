@@ -1,2 +1,7 @@
 .ipynb_checkpoints
 __pycache__
+Example_transcriptomics_data/dataProcessing.log
+Example_transcriptomics_data/dataTables/*
+Example_transcriptomics_data/oleveler.py
+Example_transcriptomics_data/Plots
+.vscode
