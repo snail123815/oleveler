@@ -1094,6 +1094,7 @@ def msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile):
 
 
 def _deseq2Comp(a, b, name, extra, subResFileName):
+    # First create environment for use in seperate threads or processes
     rstr = f"""
         #print(resultsNames(dds))
         res <- {a}(dds, {b}="{name}", parallel=TRUE{extra})
@@ -1174,11 +1175,11 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
         #print('temp file name ', fn)
         subResFile.close()
         #print('temp file name after close ', subResFile.name)
+        
         while os.path.getsize(subResFile.name) == 0:
             # print(os.path.getsize(subResFile.name))
             if i > 0:
                 logger.info(f'Failed to calculate comparison within {int(t/60)} min, retry.')
-                deseq2Process(countTable, metaDf, ref=ctr, deOnly=True)
             srf = subResFile.name.replace('\\', '\\\\')
 
             # Add time out to function. Trust me with Thread or Process!!!
@@ -1189,7 +1190,8 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
             # In Win, Process() will lose the contact with rpy2 kernel, only Thread() is safe and
             # do not have the problem of no responding r kernel (or do not have the problem like
             # above).
-            if sys.platform.startswith("win"):
+            # Maybe experiment with spawn and fork?
+            if sys.platform.startswith("win") or sys.platform == 'darwin':
                 th = Thread(target=_deseq2Comp, args=(a, b, name, extra, srf), daemon=True)
                 th.start()
                 th.join(t)
