@@ -1191,14 +1191,10 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
             # do not have the problem of no responding r kernel (or do not have the problem like
             # above).
             # Maybe experiment with spawn and fork?
-            if sys.platform.startswith("win"):
+            if sys.platform.startswith("win") or sys.platform == 'darwin':
                 th = Thread(target=_deseq2Comp, args=(a, b, name, extra, srf), daemon=True)
                 th.start()
                 th.join(t)
-            elif sys.platform == 'darwin':
-                # Can be achieved only in main process.
-                # Reason unknown, timeout function needs to be achieved by other means.
-                _deseq2Comp(a, b, name, extra, srf)
             else:
                 p = Process(target=_deseq2Comp, args=(a, b, name, extra, srf), daemon=True)
                 p.start()
