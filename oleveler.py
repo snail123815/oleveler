@@ -1093,7 +1093,13 @@ def msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile):
     return compResultFile
 
 
-def _deseq2Comp(a, b, name, extra, subResFileName):
+def _deseq2Comp(a, b, name, extra, subResFileName,
+                countTable, metaDf, ctr):
+    # First create environment for use in seperate threads or processes
+    # NOTE This is temporary fix for "could not find function "results"" or 
+    # "could not find function "lfcshrink"" under OSX.
+    # Do not know yet why.
+    deseq2Process(countTable, metaDf, ref=ctr, deOnly=True)
     rstr = f"""
         #print(resultsNames(dds))
         res <- {a}(dds, {b}="{name}", parallel=TRUE{extra})
@@ -1174,11 +1180,11 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
         #print('temp file name ', fn)
         subResFile.close()
         #print('temp file name after close ', subResFile.name)
+        
         while os.path.getsize(subResFile.name) == 0:
             # print(os.path.getsize(subResFile.name))
             if i > 0:
                 logger.info(f'Failed to calculate comparison within {int(t/60)} min, retry.')
-                deseq2Process(countTable, metaDf, ref=ctr, deOnly=True)
             srf = subResFile.name.replace('\\', '\\\\')
 
             # Add time out to function. Trust me with Thread or Process!!!
@@ -1190,13 +1196,18 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
             # do not have the problem of no responding r kernel (or do not have the problem like
             # above).
             if sys.platform.startswith("win"):
-                th = Thread(target=_deseq2Comp, args=(a, b, name, extra, srf), daemon=True)
+                th = Thread(target=_deseq2Comp, args=(a, b, name, extra, srf, countTable, metaDf, ctr), daemon=True)
                 th.start()
                 th.join(t)
             else:
-                p = Process(target=_deseq2Comp, args=(a, b, name, extra, srf), daemon=True)
-                p.start()
-                p.join(timeout=t)
+                if sys.platform == 'darwin' and a == "lfcShrink":
+                    # Can be achieved only in main process.
+                    # Reason unknown
+                    _deseq2Comp(a, b, name, extra, srf, countTable, metaDf, ctr)
+                else:
+                    p = Process(target=_deseq2Comp, args=(a, b, name, extra, srf, countTable, metaDf, ctr), daemon=True)
+                    p.start()
+                    p.join(timeout=t)
             t += timeout * max(0, i-1)  # retry once with the same time out, then increase this time.
             if t > maxRetryTime:
                 break
