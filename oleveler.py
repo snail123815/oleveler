@@ -1567,7 +1567,7 @@ def _rotateAxis(alpha, df):
     return rotated
 
 
-def calHash(*args) -> str:
+def calHash(*args, **kwargs) -> str:
     """Produce 6 digit string with unlimited number of arguments passed in
     Designed in mind that all types of data can be calculated
     resulting the same hash across platform.
@@ -1579,8 +1579,16 @@ def calHash(*args) -> str:
         except:
             d = di
         if isinstance(d, dict):
-            od = OrderedDict(sorted(d.items()))
-            for k, v in od.items():
+            safeD = {}
+            for k, v in d.items(): # if key has many types and cannot sort
+                i = 0
+                while str(k) in safeD.keys():
+                    i += 1
+                    k = str(k) + str(i)
+                newkey = str(k)
+                safeD[newkey] = v
+            od = OrderedDict(sorted(safeD.items()))
+            for k, v in od.items(): # dict in dict
                 v = orderDict(v)
                 od[str(k)] = v
             d = od
@@ -1602,30 +1610,39 @@ def calHash(*args) -> str:
         ).digest()
         return ha
 
-    haRaw = ''.encode()
-    for arg in args:
+    def haArg(arg):
         if isinstance(arg, str):
             if os.path.isfile(os.path.realpath(arg)):
                 # Less dangerous if transformed to real path.
                 # Do not think about making a dir recognisable.
                 with open(arg, 'rb') as f:
-                    haRaw += md5(f.read()).digest()
+                    ha = md5(f.read()).digest()
             else:
-                haRaw += arg.encode()
+                ha = arg.encode()
         elif isinstance(arg, set):
-            haRaw += str(sorted(list())).encode()
+            ha = str(sorted(list())).encode()
         elif isinstance(arg, dict):
-            haRaw += hashDict(arg)
+            ha = hashDict(arg)
         elif isinstance(arg, pd.core.frame.DataFrame) or isinstance(arg, pd.core.series.Series):
-            haRaw += md5(arg.to_json().encode()).digest()
+            ha = md5(arg.to_json().encode()).digest()
         elif isinstance(arg, PCA):
-            haRaw += arg.components_.tobytes()
+            ha = arg.components_.tobytes()
         elif isinstance(arg, PLS):
-            haRaw += arg.x_loadings_.tobytes()
+            ha = arg.x_loadings_.tobytes()
         else:
-            haRaw += str(arg).encode()
-    return md5(haRaw).hexdigest()[:6]
+            ha = str(arg).encode()
+        return ha
 
+    haRaw = ''.encode()
+
+    for arg in args:
+        haRaw += haArg(arg)
+
+    for k, arg in sorted(kwargs.items()):
+        haRaw += k.encode()
+        haRaw += haArg(arg)
+
+    return md5(haRaw).hexdigest()[:6]
 
 def plotCorr(df, cols=None, method='pearson', fontsize=6, figsize=(6, 5),
              vmin=0.9, vmax=1, colormap='Greens'):
@@ -2842,6 +2859,7 @@ def query(meanDf, barDf, ids, conditions, cols=None, figsize=(6, 4),
     allArgs = [meanDf, barDf, ids, conditions, cols, figsize, title, ylims, xs,
                  plotType, queryConditionGroupNames, xlabels, xlabelRotation, square]
     if not normalise is None: allArgs += [normalise]
+    # TODO args to calHash, automatic
     ha = calHash(*allArgs) ## TODO add kwargs to calHashk
     if isinstance(ids, str):
         ids = [ids]
