@@ -2973,8 +2973,13 @@ def query(meanDf, barDf, ids, conditions, cols=None, figsize=(6, 4),
         singleBar = 2*width/meanDf.shape[0]
         for i, ind in enumerate(meanDf.index):
             #             print(meanDf)
-            ax.bar(xs-width+i*singleBar, meanDf.loc[ind, :], label=ind,
-                   yerr=barDf.loc[ind, :], width=singleBar, align='edge', **kwargs)
+            ax.bar(xs-width+i*singleBar,
+                   meanDf.loc[ind, :].replace(np.nan, 0),
+                   yerr=barDf.loc[ind, :].replace(np.nan, 0),
+                   label=ind,
+                   width=singleBar,
+                   align='edge',
+                   **kwargs)
         xticks = ax.get_xticks()
         ax.set_xlim((xticks[0], xticks[-1]))
     elif plotType.startswith('line'):
