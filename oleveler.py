@@ -3031,9 +3031,11 @@ def query(
     ax.set_xticklabels(meanDf.columns)
     figtitle = f'Expression profile'
     if len(realIds) > 1:
-        ax.legend()
+        ax.legend(bbox_to_anchor=(1,1)).set_in_layout(False)
+        rect = (0,0,0.8,1)
     else:
         figtitle += f' {realIds[0]}'
+        rect = (0,0,1,1)
     figtitle += (f'\n{title}' if title != "" else "")
     ax.set_title(figtitle)
     if len(xlabels) != 0:
@@ -3055,7 +3057,7 @@ def query(
     if square:
         square_subplots(fig, ax)
     else:
-        plt.tight_layout()
+        plt.tight_layout(rect=rect)
 
     savedir = 'Plots/query'
     os.makedirs(savedir, exist_ok=True)
