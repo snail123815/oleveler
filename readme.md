@@ -11,18 +11,27 @@ For you to analyse quantitative proteomics and transcriptiomics data at ease!
 
 **Oleveler** is short for **Omics-leveler**, it only requires very basic python knowledge to work with. The analysis starts with MaxQuant result (proteomics) or `featureCount` (transcriptomics) result, do the right statistics with ease, generate customised plots including PCA, PLS, volcano, bar, etc. More importantly, this tool is designed to give you the ability to query the dataset at any time that you come up with any brilliant idea!
 
-- [1. Introduction](#1-introduction)
-- [2. Install Dependencies](#2-install-dependencies)
-- [3. **Prepare** your data - Example folder `my_analysis`](#3-prepare-your-data---example-folder-my_analysis)
-	- [3.1 Proteomics data](#31-proteomics-data)
-		- [3.1.1 Edit `Annotation.csv`](#311-edit-annotationcsv)
-		- [3.1.2 Edit `comparisons.xlsx`](#312-edit-comparisonsxlsx)
-	- [3.2 Transcriptomics data](#32-transcriptomics-data)
-		- [3.2.1 Edit `Annotation.csv`](#321-edit-annotationcsv)
-		- [3.2.2 Edit `comparisons.xlsx`](#322-edit-comparisonsxlsx)
-- [4. Start analysing](#4-start-analysing)
-- [5. Known Issues](#5-known-issues)
-- [6. References](#6-references)
+- [Omics-leveler](#omics-leveler)
+	- [1. Introduction](#1-introduction)
+	- [2. Install Dependencies](#2-install-dependencies)
+	- [3. **Prepare** your data - Example folder `my_analysis`](#3-prepare-your-data---example-folder-my_analysis)
+		- [3.1 Proteomics data](#31-proteomics-data)
+			- [3.1.1 Edit `Annotation.csv`](#311-edit-annotationcsv)
+			- [3.1.2 Edit `comparisons.xlsx`](#312-edit-comparisonsxlsx)
+		- [3.2 Transcriptomics data](#32-transcriptomics-data)
+			- [3.2.1 Edit `Annotation.csv`](#321-edit-annotationcsv)
+			- [3.2.2 Edit `comparisons.xlsx`](#322-edit-comparisonsxlsx)
+	- [4. Start analysing](#4-start-analysing)
+		- [4.1 Proteomics data](#41-proteomics-data)
+			- [4.1.1 Proteomics data import](#411-proteomics-data-import)
+			- [4.1.2 General statistics](#412-general-statistics)
+		- [4.2 Transcriptomics data](#42-transcriptomics-data)
+			- [4.2.1 Transcriptomics data import and preprocessing](#421-transcriptomics-data-import-and-preprocessing)
+			- [4.2.2 General statistics](#422-general-statistics)
+- [Differential expression analysis](#differential-expression-analysis)
+- [https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#differential-expression-analysis](#httpsbioconductororgpackagesreleasebiocvignettesdeseq2instdocdeseq2htmldifferential-expression-analysis)
+	- [5. Known Issues](#5-known-issues)
+	- [6. References](#6-references)
 
 ## 1. Introduction
 
@@ -149,7 +158,23 @@ The different analysis will show the 'log<sub>2</sub> fold changes' (LFCs) of `e
 
 ### 4.1 Proteomics data
 
+Assume your data is in the dir `MaxQuant_output`.
+
 #### 4.1.1 Proteomics data import
+
+```python
+# Load data
+lfqDf, id2group = loadMQLfqData('MaxQuant_output')
+# Load meta
+metaDf, conditions, experiments = loadMeta('Annotation.csv')
+# Calculate mean and var
+meanDf, nquantDf, varDf, stdDf, semDf = getStats(lfqDf, experiments)
+# Transformation vst using DESeq2, change the `ref` value to the sample name you want to be control
+vstDf = deseq2Process(lfqDf, metaDf, ref='QC')
+# Process raw data using MSstats
+msstatQuantDf, logDf = processMSstats('MaxQuant_output', 'Annotation.csv')
+logDfFilled = logDf.replace(np.NaN, logDf.min().min()-np.log(2))
+```
 
 #### 4.1.2 General statistics
 
@@ -179,31 +204,17 @@ vstDf = deseq2Process(selfAlignCt, metaDf, ref='WT_45')
 vstMeanDf, vstNquantDf, vstVarDf, vstStdDf, vstSemDf = getStats(vstDf, experiments, title='vst')
 ```
 
-
-
 #### 4.2.2 General statistics
 
 1. DEG analysis
 
 ```python
-# Load data
-selfAlignCt = gatherCountTable("featureCounts/")
-saDf = calculateTPM(selfAlignCt, 'featureCounts/GCF_000203835.1_ASM20383v1_genomic.gff', 
-                    tagsForGeneName='locus_tag', removerRNA=True, removeIDcontains=['SCP'])
-
-# Load meta
-metaDf, conditions, experiments = loadMeta('Annotation.csv')
-
-# Calculate mean and var
-meanDf, nquantDf, varDf, stdDf, semDf = getStats(saDf, experiments)
-
-# Transformation vst using DESeq2
-# https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization
-vstDf = deseq2Process(selfAlignCt, metaDf, ref='WT_45')
-# Calculate mean and var
-# These data should only be used in plotting, principal analysis, or other stastistical analyses.
-vstMeanDf, vstNquantDf, vstVarDf, vstStdDf, vstSemDf = getStats(vstDf, experiments, title='vst')
-```
+# Differential expression analysis
+# https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#differential-expression-analysis
+deseq2CompResults, comparisons = makeCompMatrixDeseq2('comparisons.xlsx', 
+                                                      selfAlignCt,
+                                                      'annotation.csv',
+                                                      shrink=None)```
 
 3. 
 
