@@ -731,6 +731,7 @@ def genInfoDfDESeq2(dataDf, metaDf):
     infoDf.index = metaDf.Experiment
     infoDf = infoDf.reindex(index=dataDf.columns)
     tempInfoFile = NamedTemporaryFile(delete=False)
+    infoDf.index = [c.replace('-','.') for c in infoDf.index]
     infoDf.to_csv(tempInfoFile.name, sep='\t')
     features = infoDf.columns
     return tempInfoFile, features
@@ -744,6 +745,7 @@ def writeDataForDESeq2(dataDf):
     # fill with zeros and convert to int for DESeq2 input
     feedToRDf = dataDf.replace(np.nan, 0).round().astype('int')
     tempCleanDataFile = NamedTemporaryFile(delete=False)
+    feedToRDf.columns = [c.replace('-','.') for c in feedToRDf.columns]
     feedToRDf.to_csv(tempCleanDataFile.name, sep='\t')
     return tempCleanDataFile
 
@@ -791,6 +793,7 @@ def deseq2Process(
     idxName = dataDf.index.name
     tif = tempInfoFile.name.replace('\\', '\\\\')
     tdf = tempDataFile.name.replace('\\', '\\\\')
+    print(pd.read_csv(tif, sep='\t').head())
     # Clean temp file (or Windows will raise "cannot find unused tempfile name"
     # after several loops)
     robjects.r(
@@ -806,7 +809,13 @@ def deseq2Process(
         f"""
         coldata = read.csv('{tif}', sep='\t', row.names = 1, header = TRUE)
         cts = as.matrix(read.csv('{tdf}',sep='\t', row.names = '{idxName}'))
-        print(all(rownames(coldata) == colnames(cts)))
+        """+"""
+        if (any(rownames(coldata) != colnames(cts))){
+            print("Column names not equal. Info file:")
+            print(rownames(coldata))
+            print("Data file:")
+            print(colnames(cts))
+        }
         """
     )
 
@@ -1008,6 +1017,7 @@ def processMSstats(mqDataPath, annotationPath):
         metaDf, _, _ = loadMeta(annotationPath)
         run2exp = metaDf.Experiment.to_dict()
         logDf = pd.DataFrame(index=pgIds)
+        print(runIds)
         for run in runIds:
             experiment = run2exp[run]
             data = quantTable.loc[:, ['Protein', 'LogIntensities']][quantTable.originalRUN == run]
