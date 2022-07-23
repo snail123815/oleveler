@@ -147,7 +147,65 @@ The different analysis will show the 'log<sub>2</sub> fold changes' (LFCs) of `e
 
 ## 4. Start analysing
 
-Have fun.
+### 4.1 Proteomics data
+
+#### 4.1.1 Proteomics data import
+
+#### 4.1.2 General statistics
+
+### 4.2 Transcriptomics data
+
+Assume the count table is in dir `featureCounts` and the annotation information is stored as `.gff` file. Following example is from *Streptomyces coelicolor* M145 experiments, this strain do not have natural plasmids, thus the gene from plasmids are excluded from analysis (gene ID containing 'SCP'). The annotation also support `.gbk` file format.
+
+#### 4.2.1 Transcriptomics data import and preprocessing
+
+```python
+# Load data
+selfAlignCt = gatherCountTable("featureCounts/")
+saDf = calculateTPM(selfAlignCt, 'featureCounts/GCF_000203835.1_ASM20383v1_genomic.gff', 
+                    tagsForGeneName='locus_tag', removerRNA=True, removeIDcontains=['SCP'])
+
+# Load meta
+metaDf, conditions, experiments = loadMeta('Annotation.csv')
+
+# Calculate mean and var
+meanDf, nquantDf, varDf, stdDf, semDf = getStats(saDf, experiments)
+
+# Transformation vst using DESeq2
+# https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization
+vstDf = deseq2Process(selfAlignCt, metaDf, ref='WT_45')
+# Calculate mean and var
+# These data should only be used in plotting, principal analysis, or other stastistical analyses.
+vstMeanDf, vstNquantDf, vstVarDf, vstStdDf, vstSemDf = getStats(vstDf, experiments, title='vst')
+```
+
+
+
+#### 4.2.2 General statistics
+
+1. DEG analysis
+
+```python
+# Load data
+selfAlignCt = gatherCountTable("featureCounts/")
+saDf = calculateTPM(selfAlignCt, 'featureCounts/GCF_000203835.1_ASM20383v1_genomic.gff', 
+                    tagsForGeneName='locus_tag', removerRNA=True, removeIDcontains=['SCP'])
+
+# Load meta
+metaDf, conditions, experiments = loadMeta('Annotation.csv')
+
+# Calculate mean and var
+meanDf, nquantDf, varDf, stdDf, semDf = getStats(saDf, experiments)
+
+# Transformation vst using DESeq2
+# https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization
+vstDf = deseq2Process(selfAlignCt, metaDf, ref='WT_45')
+# Calculate mean and var
+# These data should only be used in plotting, principal analysis, or other stastistical analyses.
+vstMeanDf, vstNquantDf, vstVarDf, vstStdDf, vstSemDf = getStats(vstDf, experiments, title='vst')
+```
+
+3. 
 
 ## 5. Known Issues
 
@@ -164,7 +222,7 @@ Have fun.
 
 1. Love, M.I., Huber, W. & Anders, S. Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biol 15, 550 (2014)
 
-[1]:https://doi.org/10.1186/s13059-014-0550-8 "DESeq2" 
+[1]:https://doi.org/10.1186/s13059-014-0550-8 "DESeq2"
 
 2. Meena Choi, Ching-Yun Chang, Timothy Clough, Daniel Broudy, Trevor Killeen, Brendan MacLean, Olga Vitek, MSstats: an R package for statistical analysis of quantitative mass spectrometry-based proteomic experiments, Bioinformatics, Volume 30, Issue 17, 1 September 2014, Pages 2524–2526
 
