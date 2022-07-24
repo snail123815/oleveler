@@ -38,6 +38,7 @@ from numpy.lib.arraysetops import isin
 import numpy as np
 from time import sleep  # may be used in the notebook
 from collections import OrderedDict
+import re
 from datetime import datetime
 from hashlib import md5, new
 from tempfile import NamedTemporaryFile
@@ -157,6 +158,30 @@ def writeRSessionInfo(fileName, overwrite=True, logger=None):
 
 
 # ==================== LOAD DATA =======================
+
+
+def safeExperimentNameMQ(MQDataPath):
+    '''
+    Check if the 'experiments' column contains `-`, if so, change to `.`.
+    This change should ensure success run of DESeq2'''
+    files = os.listdir(MQDataPath)
+    assert all(f in files for f in ['evidence.txt', 'proteinGroups.txt'])
+    # evidence.txt
+    evFile = os.path.join(MQDataPath, 'evidence.txt')
+    evDf = pd.read_csv(evFile, sep='\t', header=0, index_col=None)
+    assert all(c in evDf.columns for c in ['Raw file', 'Experiment']), \
+        f'Does not find "Raw file", "Experiment" column in {evFile}.\n{evDf.head()}'
+    experiments = evDf['Experiment'].unique()
+    illegal = re.compile('-+')
+    hasIllegal = False
+    for exp in experiments:
+        if illegal.match(exp):
+            hasIllegal = True
+            break
+    if hasIllegal:
+        #TODO
+        pass
+    return
 
 
 def loadMQLfqData(dataPath, minLfq=3):
@@ -793,7 +818,6 @@ def deseq2Process(
     idxName = dataDf.index.name
     tif = tempInfoFile.name.replace('\\', '\\\\')
     tdf = tempDataFile.name.replace('\\', '\\\\')
-    print(pd.read_csv(tif, sep='\t').head())
     # Clean temp file (or Windows will raise "cannot find unused tempfile name"
     # after several loops)
     robjects.r(
@@ -1017,7 +1041,6 @@ def processMSstats(mqDataPath, annotationPath):
         metaDf, _, _ = loadMeta(annotationPath)
         run2exp = metaDf.Experiment.to_dict()
         logDf = pd.DataFrame(index=pgIds)
-        print(runIds)
         for run in runIds:
             experiment = run2exp[run]
             data = quantTable.loc[:, ['Protein', 'LogIntensities']][quantTable.originalRUN == run]
