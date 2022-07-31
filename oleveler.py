@@ -166,6 +166,7 @@ def safeExperimentNameMQ(MQDataPath):
     This change should ensure success run of DESeq2'''
     files = os.listdir(MQDataPath)
     assert all(f in files for f in ['evidence.txt', 'proteinGroups.txt'])
+    
     # evidence.txt
     evFile = os.path.join(MQDataPath, 'evidence.txt')
     evDf = pd.read_csv(evFile, sep='\t', header=0, index_col=None)
@@ -175,12 +176,29 @@ def safeExperimentNameMQ(MQDataPath):
     illegal = re.compile('-+')
     hasIllegal = False
     for exp in experiments:
-        if illegal.match(exp):
+        if illegal.search(exp):
             hasIllegal = True
             break
     if hasIllegal:
-        #TODO
-        pass
+        logger.warning(f'Find illegal pattern "{illegal.pattern}" in Experiment setup, ' + \
+            'will replace it with "_"')
+        evDf['Experiment'] = evDf['Experiment'].map(lambda x: illegal.sub('_', x))
+        os.rename(evFile, evFile+'._bk')
+        evDf.to_csv(evFile, sep='\t', index=False)
+        pgFile = os.path.join(MQDataPath, 'proteinGroups.txt')
+        pgDf = pd.read_csv(pgFile, sep='\t', header=0, index_col=0)
+        newColumns = []
+        for col in pgDf.columns:
+            for exp in experiments:
+                if exp in col:
+                    cExp = illegal.sub('_', exp)
+                    col = col.replace(exp, cExp)
+                    break
+            newColumns.append(col)
+        pgDf.columns = newColumns
+        os.rename(pgFile, pgFile+'._bk')
+        pgDf.to_csv(pgFile, sep='\t')
+    
     return
 
 
