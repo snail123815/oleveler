@@ -232,6 +232,15 @@ def loadMQLfqData(dataPath, minLfq=3):
         lfqDf.to_csv(lfqTableOut, sep='\t')
         with open(lfqPickleOut, 'wb') as f:
             pickle.dump([lfqDf, id2group], f)
+    
+    try:
+        evidenceFilePath = os.path.join(dataPath, 'evidence.txt')
+        rawFiles = pd.read_csv(evidenceFilePath, sep='\t', usecols=['Raw file'])['Raw file'].unique()
+        logger.info('Raw files are:')
+        logger.info(', '.join(rawFiles))
+    except FileNotFoundError:
+        logger.warning('evidence.txt file not found, MSstats will not work.')
+
     logger.info("####### END MaxQuant LFQ data input #######\n")
     return lfqDf, id2group
 
@@ -826,20 +835,30 @@ def deseq2Process(
         coldata${design} = relevel(coldata${design}, ref=as.character("{ref}"))
         """
     )
-    robjects.r(
-        f"""
-        dds = DESeqDataSetFromMatrix(
-            countData = cts,
-            colData = coldata,
-            design = ~{design}
+
+    try:
+        robjects.r(
+            f"""
+            dds = DESeqDataSetFromMatrix(
+                countData = cts,
+                colData = coldata,
+                design = ~{design}
+            )
+            dds <- DESeq(
+                dds, test = "Wald", fitType = "parametric", sfType = "ratio",
+                betaPrior = FALSE, quiet = FALSE, useT = FALSE,
+                minmu = 0.5, parallel = FALSE
+            )
+            """
         )
-        dds <- DESeq(
-            dds, test = "Wald", fitType = "parametric", sfType = "ratio",
-            betaPrior = FALSE, quiet = FALSE, useT = FALSE,
-            minmu = 0.5, parallel = FALSE
-        )
-        """
-    )
+    except RRuntimeError as e:
+        logger.info(f'Reading data with DESeq2 result error. The current environment:')
+        logger.info('column data')
+        logger.info(robjects.r('coldata'))
+        logger.info('data table')
+        logger.info(robjects.r('head(cts)'))
+        raise(e)
+
     tempInfoFile.close()
     tempDataFile.close()
     os.remove(tempInfoFile.name)
