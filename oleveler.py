@@ -165,7 +165,7 @@ def safeCol(cols):
     return [illegal.sub("_", col) for col in cols]
 
 
-def loadMQLfqData(dataPath, minLfq=3):
+def loadMQLfqData(dataPath, minLfq=3, toRemove=[]):
     '''
     For proteomics data, process MaxQuant out put so that the result can be feed to
     DESeq2. Also good for showing the origional data.
@@ -192,7 +192,7 @@ def loadMQLfqData(dataPath, minLfq=3):
         # infer data type of each column.
         low_memory=False
     )
-    ha = calHash(proteinGroupFilePath, minLfq)
+    ha = calHash(proteinGroupFilePath, minLfq, toRemove)
 
     lfqTableOut = os.path.join(
         dataTablesPath,
@@ -232,7 +232,7 @@ def loadMQLfqData(dataPath, minLfq=3):
         lfqDf = proteinGroupsDf[lfqCols]
         # Remove 'LFQ intensity ' from column names
         lfqDf.columns = safeCol(lfqDf.columns.to_series().str.replace('LFQ intensity ', ''))
-        lfqDf = processMQLFQ(lfqDf, minLfq)
+        lfqDf = processMQLFQ(lfqDf, minLfq, toRemove)
         # Write out table
         logger.info(f'Write out table {lfqTableOut}')
         lfqDf.to_csv(lfqTableOut, sep='\t')
@@ -260,8 +260,11 @@ def loadMQLfqData(dataPath, minLfq=3):
     logger.info("####### END MaxQuant LFQ data input #######\n")
     return lfqDf, id2group
 
-def processMQLFQ(lfqDf, minLfq=3):
+def processMQLFQ(lfqDf, minLfq=3, toRemove=[]):
     lfqDf = lfqDf.copy()
+    for exp in toRemove:
+        lfqDf.drop(exp, axis=1, inplace=True)
+        logger.info(f'Experiment {exp} is removed from LFQ result of MaxQuant.')
     nProtGroupsAll = lfqDf.shape[0]
     logger.info(f'{nProtGroupsAll} protein groups in MQ output, including LFQ zeros.')
     # Reduce numbers by 1000
@@ -932,7 +935,7 @@ def clearlogfiles(msstatsLogPath='dataTables/transformed/MSstats_log/'):
             os.rename(f, os.path.join(msstatsLogPath, f))
 
 
-def prepareMSstats(mqDataPath, annotationPath):
+def prepareMSstats(mqDataPath, annotationPath, toRemove=[]):
     """
     This will be reused in calculating differences if has not done in current session.
     """
@@ -944,11 +947,15 @@ def prepareMSstats(mqDataPath, annotationPath):
     pgPath = os.path.join(mqDataPath, "proteinGroups.txt")
     evPath = os.path.join(mqDataPath, 'evidence.txt')
     logger.info('Read MaxQuant data')
-    annotationPath = safeAnnotations(annotationPath)
+    annotationPath = safeAnnotations(annotationPath, toRemove=toRemove)
+    experiments = pd.read_csv(annotationPath, header=0, usecols=['Experiment']).Experiment.unique()
     annotationPath = annotationPath.replace('\\', '\\\\')
     pgPath = pgPath.replace('\\', '\\\\')
     evPath = evPath.replace('\\', '\\\\')
-    pgPath, evPath = safeMQdata(pgPath, evPath)
+    evExperiments = safeCol(pd.read_csv(evPath, sep='\t', usecols=['Experiment']).Experiment.unique())
+    if not all(exp in experiments for exp in evExperiments):
+        toRemove = [exp for exp in evExperiments if exp not in experiments]
+    pgPath, evPath = safeMQdata(pgPath, evPath, toRemove=toRemove)
     robjects.r(
         f"""
         proteinGroups <- read.table(
@@ -986,7 +993,7 @@ def prepareMSstats(mqDataPath, annotationPath):
     clearlogfiles()
 
 
-def safeAnnotations(annotationPath):
+def safeAnnotations(annotationPath, toRemove=[]):
     conditions = pd.read_csv(annotationPath, usecols=['Condition'])['Condition'].unique()
     safeConds = safeCol(conditions)
     if not all(c in conditions for c in safeConds):
@@ -1026,53 +1033,126 @@ def safeAnnotations(annotationPath):
                     nan.write(','.join(row))
         annotationPath = anSafe_2.name
         anSafe_1.close()
+    if len(toRemove) != 0:
+        annDf = pd.read_csv(annotationPath, index_col=0, header=0)
+        for r in toRemove:
+            assert r in annDf.Experiment.values, f"{r} not in {annDf.Experiment}"
+            annDf = annDf[annDf.Experiment != r]
+        global anSafe_3
+        anSafe_3 = NamedTemporaryFile()
+        annDf.to_csv(anSafe_3.name)
+        annotationPath = anSafe_3.name
+        anSafe_2.close()
+
     return annotationPath
 
 
-def safeMQdata(pgPath, evPath):
+def safeMQdata(pgPath, evPath, toRemove=[]):
     experiments = pd.read_csv(evPath, sep='\t', usecols=['Experiment'])['Experiment'].unique()
     safeExps = safeCol(experiments)
-    if not all(e in experiments for e in safeExps):
+    if not all(e in experiments for e in safeExps) or len(toRemove) != 0:
         global pgSafe
         global evSafe
         pgSafe = NamedTemporaryFile()
         evSafe = NamedTemporaryFile()
+
+    if not all(e in experiments for e in safeExps):
         with open(evPath, 'r') as oev:
             with open(evSafe.name, 'w') as nev:
-                nev.write(oev.readline())
+                headers = oev.readline()
+                expIdx = headers.split('\t').index('Experiment')
+                nev.write(headers)
                 for l in oev:
                     row = l.split('\t')
+                    if row[expIdx] in toRemove:
+                        continue
                     try:
-                        row[14] = safeExps[experiments.tolist().index(row[14])]
+                        row[expIdx] = safeExps[experiments.tolist().index(row[expIdx])]
+                        if row[expIdx] in toRemove:
+                            continue
                     except ValueError as e:
                         raise e
                     nev.write('\t'.join(row))
-        evPath = evSafe.name
+
         with open(pgPath, 'r') as opg:
             with open(pgSafe.name, 'w') as npg:
-                header = opg.readline().split('\t')
-                nheader = []
-                for h in header:
-                    ts = h.split(' ')
+                headers = opg.readline().split('\t')
+                nheaders = []
+                toRemoveCols = []
+                for i, h in enumerate(headers):
+                    needRemoval = False
+                    ts = h.split(' ') # The experiment cannot contain space
+                    if ts[-1] in toRemove:
+                        toRemoveCols.append(i)
+                        needRemoval = True
                     try:
                         ts[-1] = safeExps[experiments.tolist().index(ts[-1])]
+                        if not needRemoval and ts[-1] in toRemove:
+                            toRemoveCols.append(i)
+                            needRemoval = True
                     except ValueError:
                         pass
-                    nheader.append(' '.join(ts))
-                npg.write('\t'.join(nheader))
-                npg.writelines(opg.readlines())
+                    if not needRemoval:
+                        nheaders.append(' '.join(ts))
+                npg.write('\t'.join(nheaders))
+                if len(toRemoveCols) == 0:
+                    npg.writelines(opg.readlines())
+                else:
+                    for l in opg:
+                        eles = l.split('\t')
+                        npg.write(
+                            '\t'.join(eles[i] for i in range(len(eles)) if i not in toRemoveCols)
+                        )
+
+        evPath = evSafe.name
         pgPath = pgSafe.name
+
+    elif len(toRemove) != 0:
+        with open(evPath, 'r') as oev:
+            with open(evSafe.name, 'w') as nev:
+                headers = oev.readline()
+                expIdx = headers.split('\t').index('Experiment')
+                nev.write(headers)
+                for l in oev:
+                    row = l.split('\t')
+                    if row[expIdx] in toRemove:
+                        continue
+                    nev.write(l)
+
+        with open(pgPath, 'r') as opg:
+            with open(pgSafe.name, 'w') as npg:
+                headers = opg.readline().split('\t')
+                nheaders = []
+                toRemoveCols = []
+                for i, h in enumerate(headers):
+                    ts = h.split(' ') # Experiment name cannot contain space
+                    if ts[-1] in toRemove:
+                        toRemoveCols.append(i)
+                        continue
+                    nheaders.append(' '.join(ts))
+                npg.write('\t'.join(nheaders))
+                if len(toRemoveCols) == 0:
+                    npg.writelines(opg.readlines())
+                else:
+                    for l in opg:
+                        eles = l.strip().split('\t')
+                        npg.write(
+                            '\t'.join(eles[i] for i in range(len(eles)) if i not in toRemoveCols)
+                        )
+
+        evPath = evSafe.name
+        pgPath = pgSafe.name
+
     return pgPath, evPath
 
 
-def processMSstats(mqDataPath, annotationPath):
+def processMSstats(mqDataPath, annotationPath, toRemove=[]):
     # calculate Hash
     pgPath = os.path.join(mqDataPath, "proteinGroups.txt")
     evPath = os.path.join(mqDataPath, 'evidence.txt')
-    ha = calHash(pgPath, evPath, annotationPath)
+    ha = calHash(pgPath, evPath, annotationPath, toRemove)
 
-    pgPath, evPath = safeMQdata(pgPath, evPath)
-    annotationPath = safeAnnotations(annotationPath)
+    annotationPath = safeAnnotations(annotationPath, toRemove)
 
     qcplotPath = f'dataTables/transformed/msstats_proposed_{ha}_QCPlot.pdf'
     proposedDataPath = f'dataTables/transformed/msstats_proposed_{ha}.tsv'
@@ -1142,8 +1222,7 @@ def processMSstats(mqDataPath, annotationPath):
     return quantTable, logDf
 
 
-def msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile):
-
+def msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile, toRemove=[]):
     _, conditions, _ = loadMeta(annotationPath)
     # the file should be based on the comparisons column
     # columns = [id,exp,con]
@@ -1186,7 +1265,7 @@ def msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile):
             logger.error("msstatsComp() failed, please passin mqDataPath and annotationPath")
             raise ValueError
         logger.info('Re-generate maxquant data in R for new comparison')
-        prepareMSstats(mqDataPath, annotationPath)
+        prepareMSstats(mqDataPath, annotationPath, toRemove=toRemove)
         robjects.r(
             """
             colnames(comparisons) <- levels(maxquant.proposed$ProteinLevelData$GROUP)
@@ -1411,7 +1490,7 @@ def _checkExistingCompResult(compExcel, sourceDf, compResultFileBase):
     return allCompResults, comparisons, compResultFile
 
 
-def makeCompMatrixMsstats(compExcel, mqDataPath, annotationPath):
+def makeCompMatrixMsstats(compExcel, mqDataPath, annotationPath, toRemove=[]):
     '''
 
     Return msstatsComparisonResultDf, comparisons
@@ -1453,14 +1532,14 @@ def makeCompMatrixMsstats(compExcel, mqDataPath, annotationPath):
     # If not, read from existing result if have.
     compResultFileBase = 'dataTables/transformed/msstats_proposed_comparisonResult.tsv'
 
-    lfqDf, _ = loadMQLfqData(mqDataPath)  # only used for check if result exists, to avoid extensive R calls
+    lfqDf, _ = loadMQLfqData(mqDataPath, toRemove=toRemove)  # only used for check if result exists, to avoid extensive R calls
     allCompResults, comparisons, compResultFile = \
         _checkExistingCompResult(compExcel, lfqDf, compResultFileBase)
     if not isinstance(allCompResults, type(None)):
         return allCompResults, comparisons
 
     logger.info(f'Parse {compExcel}, generate comparison matrix for MSstats.')
-    compResultFile = msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile)
+    compResultFile = msstatsComp(comparisons, mqDataPath, annotationPath, compResultFile, toRemove=toRemove)
     allCompResults = genComparisonResults(compResultFile, comparisons)
     logger.info(f'Done calculation, dump data in {compResultFile}\n')
     clearlogfiles()
