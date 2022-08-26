@@ -44,6 +44,7 @@ from tempfile import NamedTemporaryFile
 from threading import Thread
 from multiprocessing import Process
 from itertools import cycle
+import re
 import io
 import json
 import sys
@@ -159,6 +160,11 @@ def writeRSessionInfo(fileName, overwrite=True, logger=None):
 # ==================== LOAD DATA =======================
 
 
+def safeCol(cols):
+    illegal = re.compile(r"[ \-:,();{}+*'\"[\]\/\t\n]")
+    return [illegal.sub("_", col) for col in cols]
+
+
 def loadMQLfqData(dataPath, minLfq=3):
     '''
     For proteomics data, process MaxQuant out put so that the result can be feed to
@@ -225,21 +231,31 @@ def loadMQLfqData(dataPath, minLfq=3):
         logger.info('Remove columns except LFQ')
         lfqDf = proteinGroupsDf[lfqCols]
         # Remove 'LFQ intensity ' from column names
-        lfqDf.columns = lfqDf.columns.to_series().str.replace('LFQ intensity ', '')
+        lfqDf.columns = safeCol(lfqDf.columns.to_series().str.replace('LFQ intensity ', ''))
         lfqDf = processMQLFQ(lfqDf, minLfq)
         # Write out table
         logger.info(f'Write out table {lfqTableOut}')
         lfqDf.to_csv(lfqTableOut, sep='\t')
         with open(lfqPickleOut, 'wb') as f:
             pickle.dump([lfqDf, id2group], f)
-    
+
     try:
         evidenceFilePath = os.path.join(dataPath, 'evidence.txt')
-        rawFiles = pd.read_csv(evidenceFilePath, sep='\t', usecols=['Raw file'])['Raw file'].unique()
+        ev = pd.read_csv(evidenceFilePath, sep='\t', usecols=['Raw file', 'Experiment'])
+        rawFiles = ev['Raw file'].unique()
         logger.info('Raw files are:')
         logger.info(', '.join(rawFiles))
+        experiments = safeCol(ev['Experiment'].unique())
+        assert all(col in experiments for col in lfqDf.columns)
     except FileNotFoundError:
         logger.warning('evidence.txt file not found, MSstats will not work.')
+    except AssertionError as e:
+        logger.error('Protein groups file and evidence file do not match')
+        logger.info('Experiments in evidence.txt')
+        logger.info(experiments)
+        logger.info('Experiments in ProteinGroups.txt')
+        logger.info(lfqDf.columns)
+        raise e
 
     logger.info("####### END MaxQuant LFQ data input #######\n")
     return lfqDf, id2group
@@ -298,9 +314,13 @@ def loadMeta(path, toRemove=[]):
     logger.info(f'Metadata path: {path}')
     metaDf = pd.read_csv(path, index_col=0)
     assert not metaDf.index[0].endswith('.raw'), f'Please remove ".raw" from table {path}'
+    metaDf.loc[:,"Experiment"] = safeCol(metaDf['Experiment'])
+    metaDf.loc[:,"Condition"] = safeCol(metaDf['Condition'])
+    toRemove = safeCol(toRemove)
     metaDf = metaDf[~metaDf['Experiment'].isin(toRemove)]
     conditions = list(set(metaDf.Condition.to_list()))
     conditions.sort()
+    logger.info('All conditions: ' + ', '.join(conditions))
 
     experiments = OrderedDict()
     for c in conditions:
@@ -924,9 +944,11 @@ def prepareMSstats(mqDataPath, annotationPath):
     pgPath = os.path.join(mqDataPath, "proteinGroups.txt")
     evPath = os.path.join(mqDataPath, 'evidence.txt')
     logger.info('Read MaxQuant data')
+    annotationPath = safeAnnotations(annotationPath)
     annotationPath = annotationPath.replace('\\', '\\\\')
     pgPath = pgPath.replace('\\', '\\\\')
     evPath = evPath.replace('\\', '\\\\')
+    pgPath, evPath = safeMQdata(pgPath, evPath)
     robjects.r(
         f"""
         proteinGroups <- read.table(
@@ -964,11 +986,93 @@ def prepareMSstats(mqDataPath, annotationPath):
     clearlogfiles()
 
 
+def safeAnnotations(annotationPath):
+    conditions = pd.read_csv(annotationPath, usecols=['Condition'])['Condition'].unique()
+    safeConds = safeCol(conditions)
+    if not all(c in conditions for c in safeConds):
+        global anSafe_1
+        anSafe_1 = NamedTemporaryFile()
+        with open(annotationPath, 'r') as oan:
+            with open(anSafe_1.name, 'w') as nan:
+                nan.write(oan.readline())
+                for l in oan:
+                    row = l.split(',')
+                    try:
+                        row[1] = safeConds[conditions.tolist().index(row[1])]
+                    except ValueError as e:
+                        raise e
+                    except IndexError as e:
+                        raise e
+                    nan.write(','.join(row))
+        annotationPath = anSafe_1.name
+    experiments = pd.read_csv(annotationPath, usecols=['Experiment'])['Experiment'].unique()
+    safeExps = safeCol(experiments)
+    if not all(e in experiments for e in safeExps):
+        global anSafe_2
+        anSafe_2 = NamedTemporaryFile()
+        with open(annotationPath, 'r') as oan:
+            with open(anSafe_2.name, 'w') as nan:
+                nan.write(oan.readline())
+                for l in oan:
+                    row = l.split(',')
+                    try:
+                        row[3] = safeExps[experiments.tolist().index(row[3].strip())]
+                    except ValueError as e:
+                        raise e
+                    except IndexError as e:
+                        raise e
+                    if not row[-1].endswith('\n'):
+                        row[-1] += "\n"
+                    nan.write(','.join(row))
+        annotationPath = anSafe_2.name
+        anSafe_1.close()
+    return annotationPath
+
+
+def safeMQdata(pgPath, evPath):
+    experiments = pd.read_csv(evPath, sep='\t', usecols=['Experiment'])['Experiment'].unique()
+    safeExps = safeCol(experiments)
+    if not all(e in experiments for e in safeExps):
+        global pgSafe
+        global evSafe
+        pgSafe = NamedTemporaryFile()
+        evSafe = NamedTemporaryFile()
+        with open(evPath, 'r') as oev:
+            with open(evSafe.name, 'w') as nev:
+                nev.write(oev.readline())
+                for l in oev:
+                    row = l.split('\t')
+                    try:
+                        row[14] = safeExps[experiments.tolist().index(row[14])]
+                    except ValueError as e:
+                        raise e
+                    nev.write('\t'.join(row))
+        evPath = evSafe.name
+        with open(pgPath, 'r') as opg:
+            with open(pgSafe.name, 'w') as npg:
+                header = opg.readline().split('\t')
+                nheader = []
+                for h in header:
+                    ts = h.split(' ')
+                    try:
+                        ts[-1] = safeExps[experiments.tolist().index(ts[-1])]
+                    except ValueError:
+                        pass
+                    nheader.append(' '.join(ts))
+                npg.write('\t'.join(nheader))
+                npg.writelines(opg.readlines())
+        pgPath = pgSafe.name
+    return pgPath, evPath
+
+
 def processMSstats(mqDataPath, annotationPath):
     # calculate Hash
     pgPath = os.path.join(mqDataPath, "proteinGroups.txt")
     evPath = os.path.join(mqDataPath, 'evidence.txt')
     ha = calHash(pgPath, evPath, annotationPath)
+
+    pgPath, evPath = safeMQdata(pgPath, evPath)
+    annotationPath = safeAnnotations(annotationPath)
 
     qcplotPath = f'dataTables/transformed/msstats_proposed_{ha}_QCPlot.pdf'
     proposedDataPath = f'dataTables/transformed/msstats_proposed_{ha}.tsv'
