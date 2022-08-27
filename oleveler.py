@@ -38,6 +38,7 @@ from numpy.lib.arraysetops import isin
 import numpy as np
 from time import sleep  # may be used in the notebook
 from collections import OrderedDict
+import re
 from datetime import datetime
 from hashlib import md5, new
 from tempfile import NamedTemporaryFile
@@ -163,6 +164,48 @@ def writeRSessionInfo(fileName, overwrite=True, logger=None):
 def safeCol(cols):
     illegal = re.compile(r"[ \-:,();{}+*'\"[\]\/\t\n]")
     return [illegal.sub("_", col) for col in cols]
+
+
+def safeExperimentNameMQ(MQDataPath):
+    '''
+    Check if the 'experiments' column contains `-`, if so, change to `.`.
+    This change should ensure success run of DESeq2'''
+    files = os.listdir(MQDataPath)
+    assert all(f in files for f in ['evidence.txt', 'proteinGroups.txt'])
+    
+    # evidence.txt
+    evFile = os.path.join(MQDataPath, 'evidence.txt')
+    evDf = pd.read_csv(evFile, sep='\t', header=0, index_col=None)
+    assert all(c in evDf.columns for c in ['Raw file', 'Experiment']), \
+        f'Does not find "Raw file", "Experiment" column in {evFile}.\n{evDf.head()}'
+    experiments = evDf['Experiment'].unique()
+    illegal = re.compile('-+')
+    hasIllegal = False
+    for exp in experiments:
+        if illegal.search(exp):
+            hasIllegal = True
+            break
+    if hasIllegal:
+        logger.warning(f'Find illegal pattern "{illegal.pattern}" in Experiment setup, ' + \
+            'will replace it with "_"')
+        evDf['Experiment'] = evDf['Experiment'].map(lambda x: illegal.sub('_', x))
+        os.rename(evFile, evFile+'._bk')
+        evDf.to_csv(evFile, sep='\t', index=False)
+        pgFile = os.path.join(MQDataPath, 'proteinGroups.txt')
+        pgDf = pd.read_csv(pgFile, sep='\t', header=0, index_col=0)
+        newColumns = []
+        for col in pgDf.columns:
+            for exp in experiments:
+                if exp in col:
+                    cExp = illegal.sub('_', exp)
+                    col = col.replace(exp, cExp)
+                    break
+            newColumns.append(col)
+        pgDf.columns = newColumns
+        os.rename(pgFile, pgFile+'._bk')
+        pgDf.to_csv(pgFile, sep='\t')
+    
+    return
 
 
 def loadMQLfqData(dataPath, minLfq=3, toRemove=[]):
@@ -763,6 +806,7 @@ def genInfoDfDESeq2(dataDf, metaDf):
     infoDf.index = metaDf.Experiment
     infoDf = infoDf.reindex(index=dataDf.columns)
     tempInfoFile = NamedTemporaryFile(delete=False)
+    infoDf.index = [c.replace('-','.') for c in infoDf.index]
     infoDf.to_csv(tempInfoFile.name, sep='\t')
     features = infoDf.columns
     return tempInfoFile, features
@@ -776,6 +820,7 @@ def writeDataForDESeq2(dataDf):
     # fill with zeros and convert to int for DESeq2 input
     feedToRDf = dataDf.replace(np.nan, 0).round().astype('int')
     tempCleanDataFile = NamedTemporaryFile(delete=False)
+    feedToRDf.columns = [c.replace('-','.') for c in feedToRDf.columns]
     feedToRDf.to_csv(tempCleanDataFile.name, sep='\t')
     return tempCleanDataFile
 
@@ -838,7 +883,13 @@ def deseq2Process(
         f"""
         coldata = read.csv('{tif}', sep='\t', row.names = 1, header = TRUE)
         cts = as.matrix(read.csv('{tdf}',sep='\t', row.names = '{idxName}'))
-        print(all(rownames(coldata) == colnames(cts)))
+        """+"""
+        if (any(rownames(coldata) != colnames(cts))){
+            print("Column names not equal. Info file:")
+            print(rownames(coldata))
+            print("Data file:")
+            print(colnames(cts))
+        }
         """
     )
 

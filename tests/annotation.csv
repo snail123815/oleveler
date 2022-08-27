@@ -1,0 +1,14 @@
+Raw.file,Condition,BioReplicate,Experiment
+220706_D01,with5HT-12h,1,with5HT-12h-1
+220706_D02,control-12h,1,control-12h-1
+220706_D03,with5HT-24h,1,with5HT-24h-1
+220706_D04,control-24h,1,control-24h-1
+220706_D05,with5HT-24h,2,with5HT-24h-2
+220706_D06,with5HT-12h,2,with5HT-12h-2
+220706_D07,control-24h,2,control-24h-2
+220706_D08,control-12h,2,control-12h-2
+220706_D09,with5HT-12h,3,with5HT-12h-3
+220706_D10,control-24h,3,control-24h-3
+220706_D11,with5HT-24h,3,with5HT-24h-3
+220706_D12,control-12h,3,control-12h-3
+220705_Du_Mix_01,MIX,1,MIX
