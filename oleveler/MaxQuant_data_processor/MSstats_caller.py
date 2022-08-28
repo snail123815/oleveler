@@ -1,12 +1,12 @@
 import os
 import pandas as pd
-from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects.packages as rpackages
+from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects as robjects
-from oleveler import calHash, loadMeta, genComparisonResults
-# from oleveler.project_logger import logger
+from oleveler import calHash
 from oleveler.safe_annotations import safeCol, safeAnnotations, safeMQdata, logger
-from oleveler.main import _checkExistingCompResult
+from oleveler.comparison_processor import _checkExistingCompResult, genComparisonResults
+from oleveler.metadata_processor import loadMeta
 from .MaxQuant_data_loader import loadMQLfqData
 
 # MSstats proposition

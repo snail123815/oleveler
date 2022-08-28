@@ -8,9 +8,9 @@ from collections import OrderedDict
 from rpy2 import robjects
 from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects.packages as rpackages
-# from oleveler.project_logger import logger
-from oleveler import calHash, loadMeta, genComparisonResults, logger
-from oleveler.main import _checkExistingCompResult
+from oleveler import calHash, logger
+from oleveler.comparison_processor import _checkExistingCompResult, genComparisonResults
+from oleveler.metadata_processor import loadMeta
 from threading import Thread
 from multiprocessing import Process
 
