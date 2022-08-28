@@ -6,8 +6,6 @@
 # durand[dot]dc[at]hotma[no space]il.com
 ############################################
 
-from statistics import mean
-from jupyterthemes import jtplot
 from scipy.cluster.hierarchy import fcluster
 from scipy.stats import mannwhitneyu
 from sklearn.covariance import EllipticEnvelope
@@ -16,9 +14,8 @@ from sklearn.neighbors import LocalOutlierFactor
 from sklearn.ensemble import IsolationForest
 from sklearn.cross_decomposition import PLSRegression as PLS
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
-from matplotlib.legend_handler import HandlerLine2D, HandlerTuple
-from matplotlib.collections import PathCollection
+from sklearn.preprocessing import MinMaxScaler
+from matplotlib.legend_handler import HandlerTuple
 import seaborn as sns
 import matplotlib.gridspec as gridspec
 from matplotlib.patches import Patch
@@ -34,179 +31,26 @@ import rpy2.robjects as robjects
 from BCBio import GFF
 from pandas.errors import EmptyDataError
 import pandas as pd
-from numpy.lib.arraysetops import isin
 import numpy as np
-from time import sleep  # may be used in the notebook
 from collections import OrderedDict
 import re
-from datetime import datetime
-from hashlib import md5, new
+from hashlib import md5
 from tempfile import NamedTemporaryFile
 from threading import Thread
 from multiprocessing import Process
 from itertools import cycle
 import re
-import io
 import json
 import sys
-import logging
-from inspect import signature
 import pickle
 import os
 import itertools
 
-olevelerVersion = 1.1
-infoText = f'''
-Oleveler - omics data analysis tools for jupyter notebook
-
-Version {olevelerVersion}
----
-by Chao DU
-Institute of Biology Leiden, Leiden University, the Netherlands
-c.du@biology.leidenuniv.nl
-durand[dot]dc[at]hot[no space]mail.com
----
-
-'''
-
-
-logger = logging.getLogger()
-logging.getLogger('matplotlib.font_manager').disabled = True
-if len(logger.handlers) == 0:
-    logFormatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] - %(message)s'
-    )
-    logfhandler = logging.FileHandler('dataProcessing.log')
-    logfhandler.setLevel(logging.INFO)
-    logfhandler.setFormatter(logFormatter)
-    logshandler = logging.StreamHandler(stream=sys.stdout)
-    logshandler.setLevel(logging.INFO)
-    logshandler.setFormatter(logFormatter)
-    logger.addHandler(logfhandler)
-    logger.addHandler(logshandler)
-    logger.setLevel(logging.INFO)
-
-logger.info(infoText)
-
-
-def displayImage(src, background=None, **kwargs):
-    from IPython.display import Image, SVG, display
-    from IPython.core.display import HTML
-    if src[-4:].lower() == '.svg':
-        htmlstr = '<div class="jp-RenderedSVG jp-OutputArea-output " data-mime-type="image/svg+xml">'
-        svgstr = SVG(data=src)._repr_svg_()
-        if not isinstance(background, type(None)):
-            bgstr = f'style="background-color:{background}"'
-            svgstr = '<svg ' + bgstr + svgstr[4:]
-        htmlstr += svgstr + '</div>'
-        display(HTML(htmlstr))
-    else:
-        img = Image(data=src)
-        fmt = img.format
-        if fmt == 'png':
-            htmlstr = '<div class="jp-RenderedImage jp-OutputArea-output ">'
-            htmlstr += f'\n<img src="data:image/png;base64,{img._repr_png_()}"></div>'
-            if not isinstance(background, type(None)):
-                htmlstr = htmlstr[:-7] + f'style="background-color:{background}"' + htmlstr[-7:]
-            display(HTML(htmlstr))
-        else:
-            logger.warning('background for none PNG image will be ignored')
-            display(img)
-
-
-def setDarkModePlotting(forceDark=False, forceWhite=False):
-    if 'current_jupyterthemes_style_dark' not in globals():
-        global current_jupyterthemes_style_dark
-        current_jupyterthemes_style_dark = False
-    if (current_jupyterthemes_style_dark and not forceDark) or forceWhite:
-        logger.warning('Change plot style to default')
-        jtplot.reset()
-        current_jupyterthemes_style_dark = False
-    else:
-        logger.warning('Change plot style to dark (monokai)')
-        jtplot.style(theme='monokai', context='notebook', ticks=True, grid=False)
-        current_jupyterthemes_style_dark = True
-
-
-def writeRSessionInfo(fileName, overwrite=True, logger=None):
-
-    def printToString(*args, **kwargs):
-        with io.StringIO() as output:
-            print(*args, file=output, **kwargs)
-            contents = output.getvalue()
-        return contents
-
-    if isinstance(logger, type(None)):
-        logger = logging.getLogger()
-    try:
-        sinfo = 'Attached packages in current R session:\n' + '=' * 80 + '\n'
-        for l in robjects.r('sessionInfo()["otherPkgs"]')[0]:
-            x = printToString(l).split('\n')
-            y = [a for a in x if len(a) > 0 and not a.startswith('-- File:')]
-            z = '\n'.join(y) + '\n\n' + "=" * 80 + '\n'
-            sinfo += z
-    except TypeError:
-        logger.info('No R packages loaded in current session')
-        return 0
-    logger.info(sinfo)
-    if not overwrite:
-        if os.path.isfile(fileName):
-            logger.info(f'File {fileName} exists, will not overwrite.')
-            return 0
-    with open(fileName, 'w') as fh:
-        fh.write(sinfo)
-    return 1
-
+from .logger import logger
+from .side_notebook_functions import current_jupytertheme_style
+from .safe_annotations import safeCol, safeAnnotations, safeMQdata
 
 # ==================== LOAD DATA =======================
-
-
-def safeCol(cols):
-    illegal = re.compile(r"[ \-:,();{}+*'\"[\]\/\t\n]")
-    return [illegal.sub("_", col) for col in cols]
-
-
-def safeExperimentNameMQ(MQDataPath):
-    '''
-    Check if the 'experiments' column contains `-`, if so, change to `.`.
-    This change should ensure success run of DESeq2'''
-    files = os.listdir(MQDataPath)
-    assert all(f in files for f in ['evidence.txt', 'proteinGroups.txt'])
-    
-    # evidence.txt
-    evFile = os.path.join(MQDataPath, 'evidence.txt')
-    evDf = pd.read_csv(evFile, sep='\t', header=0, index_col=None)
-    assert all(c in evDf.columns for c in ['Raw file', 'Experiment']), \
-        f'Does not find "Raw file", "Experiment" column in {evFile}.\n{evDf.head()}'
-    experiments = evDf['Experiment'].unique()
-    illegal = re.compile('-+')
-    hasIllegal = False
-    for exp in experiments:
-        if illegal.search(exp):
-            hasIllegal = True
-            break
-    if hasIllegal:
-        logger.warning(f'Find illegal pattern "{illegal.pattern}" in Experiment setup, ' + \
-            'will replace it with "_"')
-        evDf['Experiment'] = evDf['Experiment'].map(lambda x: illegal.sub('_', x))
-        os.rename(evFile, evFile+'._bk')
-        evDf.to_csv(evFile, sep='\t', index=False)
-        pgFile = os.path.join(MQDataPath, 'proteinGroups.txt')
-        pgDf = pd.read_csv(pgFile, sep='\t', header=0, index_col=0)
-        newColumns = []
-        for col in pgDf.columns:
-            for exp in experiments:
-                if exp in col:
-                    cExp = illegal.sub('_', exp)
-                    col = col.replace(exp, cExp)
-                    break
-            newColumns.append(col)
-        pgDf.columns = newColumns
-        os.rename(pgFile, pgFile+'._bk')
-        pgDf.to_csv(pgFile, sep='\t')
-    
-    return
-
 
 def loadMQLfqData(dataPath, minLfq=3, toRemove=[]):
     '''
@@ -302,6 +146,7 @@ def loadMQLfqData(dataPath, minLfq=3, toRemove=[]):
 
     logger.info("####### END MaxQuant LFQ data input #######\n")
     return lfqDf, id2group
+
 
 def processMQLFQ(lfqDf, minLfq=3, toRemove=[]):
     lfqDf = lfqDf.copy()
@@ -1044,159 +889,6 @@ def prepareMSstats(mqDataPath, annotationPath, toRemove=[]):
     clearlogfiles()
 
 
-def safeAnnotations(annotationPath, toRemove=[]):
-    conditions = pd.read_csv(annotationPath, usecols=['Condition'])['Condition'].unique()
-    safeConds = safeCol(conditions)
-    if not all(c in conditions for c in safeConds):
-        global anSafe_1
-        anSafe_1 = NamedTemporaryFile()
-        with open(annotationPath, 'r') as oan:
-            with open(anSafe_1.name, 'w') as nan:
-                nan.write(oan.readline())
-                for l in oan:
-                    row = l.split(',')
-                    try:
-                        row[1] = safeConds[conditions.tolist().index(row[1])]
-                    except ValueError as e:
-                        raise e
-                    except IndexError as e:
-                        raise e
-                    nan.write(','.join(row))
-        annotationPath = anSafe_1.name
-    experiments = pd.read_csv(annotationPath, usecols=['Experiment'])['Experiment'].unique()
-    safeExps = safeCol(experiments)
-    if not all(e in experiments for e in safeExps):
-        global anSafe_2
-        anSafe_2 = NamedTemporaryFile()
-        with open(annotationPath, 'r') as oan:
-            with open(anSafe_2.name, 'w') as nan:
-                nan.write(oan.readline())
-                for l in oan:
-                    row = l.split(',')
-                    try:
-                        row[3] = safeExps[experiments.tolist().index(row[3].strip())]
-                    except ValueError as e:
-                        raise e
-                    except IndexError as e:
-                        raise e
-                    if not row[-1].endswith('\n'):
-                        row[-1] += "\n"
-                    nan.write(','.join(row))
-        annotationPath = anSafe_2.name
-        anSafe_1.close()
-    if len(toRemove) != 0:
-        annDf = pd.read_csv(annotationPath, index_col=0, header=0)
-        for r in toRemove:
-            assert r in annDf.Experiment.values, f"{r} not in {annDf.Experiment}"
-            annDf = annDf[annDf.Experiment != r]
-        global anSafe_3
-        anSafe_3 = NamedTemporaryFile()
-        annDf.to_csv(anSafe_3.name)
-        annotationPath = anSafe_3.name
-        anSafe_2.close()
-
-    return annotationPath
-
-
-def safeMQdata(pgPath, evPath, toRemove=[]):
-    experiments = pd.read_csv(evPath, sep='\t', usecols=['Experiment'])['Experiment'].unique()
-    safeExps = safeCol(experiments)
-    if not all(e in experiments for e in safeExps) or len(toRemove) != 0:
-        global pgSafe
-        global evSafe
-        pgSafe = NamedTemporaryFile()
-        evSafe = NamedTemporaryFile()
-
-    if not all(e in experiments for e in safeExps):
-        with open(evPath, 'r') as oev:
-            with open(evSafe.name, 'w') as nev:
-                headers = oev.readline()
-                expIdx = headers.split('\t').index('Experiment')
-                nev.write(headers)
-                for l in oev:
-                    row = l.split('\t')
-                    if row[expIdx] in toRemove:
-                        continue
-                    try:
-                        row[expIdx] = safeExps[experiments.tolist().index(row[expIdx])]
-                        if row[expIdx] in toRemove:
-                            continue
-                    except ValueError as e:
-                        raise e
-                    nev.write('\t'.join(row))
-
-        with open(pgPath, 'r') as opg:
-            with open(pgSafe.name, 'w') as npg:
-                headers = opg.readline().split('\t')
-                nheaders = []
-                toRemoveCols = []
-                for i, h in enumerate(headers):
-                    needRemoval = False
-                    ts = h.split(' ') # The experiment cannot contain space
-                    if ts[-1] in toRemove:
-                        toRemoveCols.append(i)
-                        needRemoval = True
-                    try:
-                        ts[-1] = safeExps[experiments.tolist().index(ts[-1])]
-                        if not needRemoval and ts[-1] in toRemove:
-                            toRemoveCols.append(i)
-                            needRemoval = True
-                    except ValueError:
-                        pass
-                    if not needRemoval:
-                        nheaders.append(' '.join(ts))
-                npg.write('\t'.join(nheaders))
-                if len(toRemoveCols) == 0:
-                    npg.writelines(opg.readlines())
-                else:
-                    for l in opg:
-                        eles = l.split('\t')
-                        npg.write(
-                            '\t'.join(eles[i] for i in range(len(eles)) if i not in toRemoveCols)
-                        )
-
-        evPath = evSafe.name
-        pgPath = pgSafe.name
-
-    elif len(toRemove) != 0:
-        with open(evPath, 'r') as oev:
-            with open(evSafe.name, 'w') as nev:
-                headers = oev.readline()
-                expIdx = headers.split('\t').index('Experiment')
-                nev.write(headers)
-                for l in oev:
-                    row = l.split('\t')
-                    if row[expIdx] in toRemove:
-                        continue
-                    nev.write(l)
-
-        with open(pgPath, 'r') as opg:
-            with open(pgSafe.name, 'w') as npg:
-                headers = opg.readline().split('\t')
-                nheaders = []
-                toRemoveCols = []
-                for i, h in enumerate(headers):
-                    ts = h.split(' ') # Experiment name cannot contain space
-                    if ts[-1] in toRemove:
-                        toRemoveCols.append(i)
-                        continue
-                    nheaders.append(' '.join(ts))
-                npg.write('\t'.join(nheaders))
-                if len(toRemoveCols) == 0:
-                    npg.writelines(opg.readlines())
-                else:
-                    for l in opg:
-                        eles = l.strip().split('\t')
-                        npg.write(
-                            '\t'.join(eles[i] for i in range(len(eles)) if i not in toRemoveCols)
-                        )
-
-        evPath = evSafe.name
-        pgPath = pgSafe.name
-
-    return pgPath, evPath
-
-
 def processMSstats(mqDataPath, annotationPath, toRemove=[]):
     # calculate Hash
     pgPath = os.path.join(mqDataPath, "proteinGroups.txt")
@@ -1672,12 +1364,12 @@ def getSig(compDf, tFc=1.5, tPv=0.05):
 
 def grayout(c, scale=1.8):
     newc = list(colors.to_rgba(c))
-    target = 1
-    if "current_jupyterthemes_style_dark" in globals():
-        if current_jupyterthemes_style_dark:
-            target = 0
+    if current_jupytertheme_style == 'dark':
+        toValue = 0
+    else:
+        toValue = 1
     for i in range(3):
-        newc[i] = target + (newc[i] - target)/scale
+        newc[i] = toValue + (newc[i] - toValue)/scale
     return newc
 
 
@@ -2733,9 +2425,8 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     ax.set_xlim((-xmax, xmax))
     ax.set_ylim((ymin, ymax))
     lineColor = 'k'
-    if "current_jupyterthemes_style_dark" in globals():
-        if current_jupyterthemes_style_dark:
-            lineColor = 'w'
+    if current_jupytertheme_style == 'dark':
+        lineColor = 'w'
     ax.axhline(logpThresh, c=lineColor, linestyle='--', linewidth=0.3)
     ax.axvline(-lfcThresh, c=lineColor, linestyle='--', linewidth=0.3)
     ax.axvline(lfcThresh,  c=lineColor, linestyle='--', linewidth=0.3)
