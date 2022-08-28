@@ -1,7 +1,7 @@
 import os
 import io
 from jupyterthemes import jtplot
-from .logger import logger
+from .project_logger import logger
 from typing import Literal
 import rpy2.robjects as robjects
 

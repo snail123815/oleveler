@@ -2,7 +2,7 @@ import os
 import re
 from tempfile import NamedTemporaryFile
 import pandas as pd
-from .logger import logger
+from .project_logger import logger
 
 
 def safeCol(cols):

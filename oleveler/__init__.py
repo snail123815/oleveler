@@ -7,4 +7,5 @@ from .side_notebook_functions import \
 
 from time import sleep
 
+from .MaxQuant_data_processor import *
 from .RNASeq_processor import *

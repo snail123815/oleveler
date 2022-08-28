@@ -3,7 +3,8 @@ import os
 import pandas as pd
 import numpy as np
 
-from oleveler import logger, calHash
+# from oleveler.project_logger import logger
+from oleveler import calHash, logger
 from .biology_information import _parseGff, _parseTableForGeneLength
 
 
