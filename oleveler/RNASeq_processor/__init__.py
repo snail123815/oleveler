@@ -1,2 +1,2 @@
 from .DESeq2_caller import *
-from .basic_calculator import gatherCountTable, calculateTPM
+from .RNASeq_loader import gatherCountTable, calculateTPM
