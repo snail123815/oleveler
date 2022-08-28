@@ -6,3 +6,5 @@ from .side_notebook_functions import \
     writeRSessionInfo
 
 from time import sleep
+
+from .RNASeq_processor import *
