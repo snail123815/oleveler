@@ -55,7 +55,7 @@ import pickle
 import os
 import itertools
 
-olevelerVersion = 1.0
+olevelerVersion = 1.1
 infoText = f'''
 Oleveler - omics data analysis tools for jupyter notebook
 
