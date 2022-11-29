@@ -42,9 +42,10 @@ def _parseGff(gff, tags, getTypes=['rRNA']):
                 assert geneId != '', f'Gene name not found with tag "{tags}", feature:\n{feat}'
                 geneLen = len(feat)
                 geneLengths[geneId] = geneLen
-                for i, t in enumerate(getTypes):
-                    if t in feat.qualifiers['gene_biotype']:
-                        targetTypes[i].append(geneId)
+                if 'gene_biotype' in feat.qualifiers:
+                    for i, t in enumerate(getTypes):
+                        if t in feat.qualifiers['gene_biotype']:
+                            targetTypes[i].append(geneId)
     return geneLengths, targetTypes
 
 
