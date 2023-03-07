@@ -109,14 +109,14 @@ def processMQLFQ(lfqDf, minLfq=3, toRemove=[]):
         lfqDf.drop(exp, axis=1, inplace=True)
         logger.info(f'Experiment {exp} is removed from LFQ result of MaxQuant.')
     nProtGroupsAll = lfqDf.shape[0]
-    logger.info(f'{nProtGroupsAll} protein groups in MQ output, including LFQ zeros.')
+    logger.info(f'{nProtGroupsAll} rows in MQ output, including LFQ zeros.')
     # Reduce numbers by 1000
     logger.info('Reduce numbers by 1000')
     lfqDf = lfqDf.replace(np.nan, 0)
     lfqDf = lfqDf / 1000
     # Make all numbers as int type for DESeq2
-    logger.info('Make all numbers as int type for DESeq2')
-    lfqDf = lfqDf.astype('int')
+    logger.info('Round up all numbers for DESeq2')
+    lfqDf = lfqDf.round()
     # Replace 0 with NA
     logger.info('Replace 0 with NA')
     lfqDf = lfqDf.replace(0, np.nan)
@@ -124,5 +124,5 @@ def processMQLFQ(lfqDf, minLfq=3, toRemove=[]):
     logger.info(f'Remove < {minLfq} quantifications')
     lfqDf = lfqDf[(~lfqDf.isna()).sum(axis=1) >= minLfq]
     nProtGroups = lfqDf.shape[0]
-    logger.info(f'Removed {nProtGroupsAll - nProtGroups} protein groups, now {nProtGroups}.')
+    logger.info(f'Removed {nProtGroupsAll - nProtGroups} rows, now {nProtGroups}.')
     return lfqDf
