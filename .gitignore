@@ -12,4 +12,7 @@ Example_transcriptomics_data/RSessionInfo.txt
 backup_mqres/
 mqrun/
 dataProcessing.log
-
+Annotation.csv
+Plots/
+comparisons.xlsx
+dataTables/
