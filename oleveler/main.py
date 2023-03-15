@@ -1176,6 +1176,7 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
         vFilledDf.to_excel(tabFilledFile)
         vDf.to_excel(tabFile)
     plt.show()
+    return vDf
 
 
 def plotHeatmapGetCluster(
