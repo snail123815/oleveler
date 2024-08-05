@@ -1,4 +1,5 @@
 from oleveler import logger, calHash
+from pathlib import Path
 import os
 import pickle
 import pandas as pd
@@ -125,4 +126,109 @@ def processMQLFQ(lfqDf, minLfq=3, toRemove=[]):
     lfqDf = lfqDf[(~lfqDf.isna()).sum(axis=1) >= minLfq]
     nProtGroups = lfqDf.shape[0]
     logger.info(f'Removed {nProtGroupsAll - nProtGroups} rows, now {nProtGroups}.')
+    return lfqDf
+
+
+# Replacement of
+# loadMQLfqData(dataPath, minLfq=3, toRemove=[]):
+# processMQLFQ(lfqDf, minLfq=3, toRemove=[]):
+# NOTE: the id2group variable is NOT returned!!!!
+
+def processAnyLFQ(lfqDf, minLfq=3, toRemove=[]):
+    lfqDf = lfqDf.copy()
+    for exp in toRemove:
+        lfqDf.drop(exp, axis=1, inplace=True)
+        logger.info(f"Experiment {exp} is removed from table.")
+    nProtGroupsAll = lfqDf.shape[0]
+    logger.info(
+        f"{nProtGroupsAll} protein groups from input table, including zeros."
+    )
+    lfqDf = lfqDf.replace(np.nan, 0)
+
+    # Reduce data range if max value exceed int32 max value in R
+    max_value = lfqDf.to_numpy().max()
+    if max_value >= 2147483647:
+        reducing_factor = np.ceil(max_value / 2147483647)
+        logger.info(
+            "Max value of input data is larger than int32 "
+            f"can store, reduced by factor of {reducing_factor}"
+        )
+        lfqDf = lfqDf / reducing_factor
+
+    # Replace 0 with NA
+    logger.info("Replace 0 with NA")
+    lfqDf = lfqDf.replace(0, np.nan)
+    # remove all zeros and < minLfq quantifications
+    logger.info(
+        f"Remove protein groups that have < {minLfq} quantifications"
+        " across ALL samples."
+    )
+    lfqDf = lfqDf[(~lfqDf.isna()).sum(axis=1) >= minLfq]
+    nProtGroups = lfqDf.shape[0]
+    logger.info(
+        f"Removed {nProtGroupsAll - nProtGroups} protein groups,"
+        f" now {nProtGroups}."
+    )
+    logger.info(
+        "Make all numbers as int type for DESeq2, (nan will be 0 again)."
+    )
+    lfqDf = lfqDf.replace(np.nan, 0)
+    lfqDf = lfqDf.astype("int")
+    return lfqDf
+
+
+def loadAnyTable(dataPath, minLfq=3, toRemove=[]) -> pd.DataFrame:
+    """
+    For proteomics data, process output so that the result can be feed to
+    DESeq2. Also good for showing the origional data.
+    Filter out the identifications with less than 3;
+    Check all data if they fit int32 for R, if not, reduce.
+
+    Data format:
+    1. First row is experiment names
+    2. First column is protein group names
+    3. Except first row and column, all other parts are data.
+    """
+    logger.info("####### Any data input #######")
+    dataTablesPath = Path("./dataTables")
+    dataTablesPath.mkdir(exist_ok=True)
+
+    ha = calHash(dataPath, minLfq, toRemove)
+
+    proteinGroupsDf = pd.read_csv(
+        dataPath,
+        sep="\t",
+        header=0,
+        index_col=0,
+        # to use read in all data without warning.
+        # The table is quite complicated, and has
+        # mixed types for some columns if pandas
+        # infer data type of each column.
+        low_memory=False,
+    )
+
+    lfqTableOut = dataTablesPath / f"Any_PG_table_{ha}.tsv"
+    lfqPickleOut = dataTablesPath / f"Any_PG_table_{ha}_with_id.df.pickle"
+
+    if lfqTableOut.exists() and lfqPickleOut.exists():
+        logger.info("Found processed LFQ data in program folder.")
+        logger.info(lfqPickleOut)
+        logger.info(lfqTableOut)
+        with open(lfqPickleOut, "rb") as f:
+            lfqDf = pickle.load(f)
+    else:
+        logger.info("Processing protein groups table.")
+        # MaxQuant data processing
+        logger.info(dataPath)
+        # get id from the table
+        proteinGroupsDf.index.name = "Protein_IDs"
+        # get column names of LFQ data
+        lfqDf = processAnyLFQ(proteinGroupsDf, minLfq, toRemove)
+        # Write out table
+        logger.info(f"Write out table {lfqTableOut}")
+        lfqDf.to_csv(lfqTableOut, sep="\t")
+        with open(lfqPickleOut, "wb") as f:
+            pickle.dump(lfqDf, f)
+
+    logger.info("####### END Any data input #######\n")
     return lfqDf
