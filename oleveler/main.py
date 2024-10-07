@@ -821,7 +821,7 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
     plsDf, PlsClass, r2 = doPLS(df, classes, ntop=ntop)
 
     dfPlot = pd.DataFrame(
-        np.array((PlsClass.coef_[:, tClass], calculateVips(PlsClass))).T,
+        np.array((PlsClass.coef_[tClass,:], calculateVips(PlsClass))).T,
         index=df.index,
         columns=["coef", "VIP"],
     )
@@ -880,7 +880,7 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
     ax.set_xlabel("Correlation Coefficient")
     ax.set_ylabel("Variable Importance in Projection")
 
-    xlims = PlsClass.coef_[:, 0].min(), PlsClass.coef_[:, 0].max()
+    xlims = PlsClass.coef_[0,:].min(), PlsClass.coef_[0,:].max()
     maxXlim = max(abs(xlims[0]), abs(xlims[1]))
     expendX = maxXlim * 0.1
     xlims = [-maxXlim-expendX, maxXlim+expendX]
