@@ -1,8 +1,10 @@
 .ipynb_checkpoints
 __pycache__
 Example_transcriptomics_data/dataProcessing.log
-Example_transcriptomics_data/dataTables/*
-Example_transcriptomics_data/oleveler.py
+Example_transcriptomics_data/dataTables
+Example_transcriptomics_data/oleveler
 Example_transcriptomics_data/Plots
+Example_transcriptomics_data/RSessionInfo.txt
 .vscode
 .DS_Store
+.mypy_cache
