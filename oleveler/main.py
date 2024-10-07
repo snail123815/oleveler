@@ -1060,12 +1060,12 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
             highlights = [highlights]
         for i, hls in enumerate(reversed(highlights)):
             c = next(defaultHighlightColours)
-            nhls = set(hls).intersection(set(commonIds))
-            if len(hls) > len(nhls):
-                nhls = sorted(list(nhls))
+            hls_with_data = set(hls).intersection(set(commonIds))
+            if len(hls) > len(hls_with_data):
+                hls_with_data = sorted(list(hls_with_data))
                 [logger.warning(f'{i} do not have valid corresponding data, ignored') \
-                        for i in nhls]
-                hls = nhls
+                        for i in hls if i not in hls_with_data]
+                hls = hls_with_data
             name = ','.join(hls)[:16] + calHash(hls) # make sure it is unique
             hlDict[name] = c
             zorders.loc[hls] = i + 2
@@ -1080,12 +1080,12 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
             except (IndexError, AssertionError):
                 c = next(defaultHighlightColours)
             hlDict[name] = c
-            nhls = set(hls).intersection(set(commonIds))
-            if len(hls) > len(nhls):
-                nhls = sorted(list(nhls))
+            hls_with_data = set(hls).intersection(set(commonIds))
+            if len(hls) > len(hls_with_data):
+                hls_with_data = sorted(list(hls_with_data))
                 [logger.warning(f'{i} do not have valid corresponding data, ignored') \
-                        for i in nhls]
-                hls = nhls
+                        for i in hls if i not in hls_with_data]
+                hls = hls_with_data
             zorders.loc[hls] = i + 2
             colours = changeColours(hls, colours, c)
 
