@@ -29,14 +29,23 @@ def getStats(dataDf, experiments, title=''):
         return outputDfs
     conditions = list(experiments.keys())
     logger.info('Calculate stats with ddof at least 1 (ignoring the conditions with only one quantification).\n')
-    resDf = pd.DataFrame(index=dataDf.index, columns=conditions)
+    conditions_in_table = []
+    for c in conditions:
+        try:
+            dataDf.loc[:, experiments[c]]
+        except KeyError:
+            assert all([x not in dataDf.columns for x in experiments[c]]), f'Error: {experiments[c]} partially found in dataDf. Columns:\n{dataDf.columns}'
+            continue
+        conditions_in_table.append(c)
+
+    resDf = pd.DataFrame(index=dataDf.index, columns=conditions_in_table)
     meanDf = resDf.copy()
     stdDf = resDf.copy()
     nquantDf = resDf.copy()
     semDf = resDf.copy()
     varDf = resDf.copy()
 
-    for c in conditions:
+    for c in conditions_in_table:
         data = dataDf.loc[:, experiments[c]]
 
         mean = np.nanmean(data, axis=1)
