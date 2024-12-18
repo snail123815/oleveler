@@ -270,16 +270,14 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
         # So in practice, each of the python processes connects to the same R process.
         maxRetryTime = 30*60  # 30 min
         i = 0
-        t = timeout
         #fn = subResFile.name
         #print('temp file name ', fn)
         subResFile.close()
         #print('temp file name after close ', subResFile.name)
-        
         while os.path.getsize(subResFile.name) == 0:
             # print(os.path.getsize(subResFile.name))
             if i > 0:
-                logger.info(f'Failed to calculate comparison within {int(t/60)} min, retry.')
+                logger.info(f'Failed to calculate comparison within {int(timeout/60)} min, retry.')
             srf = subResFile.name.replace('\\', '\\\\')
 
             # Add time out to function. Trust me with Thread or Process!!!
@@ -290,17 +288,19 @@ def deseq2Comp(comparisons, countTable, annotationPath, compResultFile, lfcShrin
             # In Win, Process() will lose the contact with rpy2 kernel, only Thread() is safe and
             # do not have the problem of no responding r kernel (or do not have the problem like
             # above).
-            # Maybe experiment with spawn and fork?
-            if sys.platform.startswith("win") or sys.platform == 'darwin':
+            # Maybe experiment with spawn and fork?if sys.platform.startswith("win"):
+            if sys.platform.startswith("win"):
                 th = Thread(target=_deseq2Comp, args=(a, b, name, extra, srf), daemon=True)
                 th.start()
-                th.join(t)
+                th.join(timeout=timeout)
+            elif sys.platform == 'darwin':
+                _deseq2Comp(a, b, name, extra, srf)
             else:
                 p = Process(target=_deseq2Comp, args=(a, b, name, extra, srf), daemon=True)
                 p.start()
-                p.join(timeout=t)
-            t += timeout * max(0, i-1)  # retry once with the same time out, then increase this time.
-            if t > maxRetryTime:
+                p.join(timeout=timeout)
+            timeout += timeout * max(0, i-1)  # retry once with the same time out, then increase this time.
+            if timeout > maxRetryTime:
                 break
             i += 1
         try:
