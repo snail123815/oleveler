@@ -8,3 +8,11 @@ Example_transcriptomics_data/RSessionInfo.txt
 .vscode
 .DS_Store
 .mypy_cache
+*.ipynb
+backup_mqres/
+mqrun/
+dataProcessing.log
+Annotation.csv
+Plots/
+comparisons.xlsx
+dataTables/
