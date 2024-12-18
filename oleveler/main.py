@@ -821,7 +821,7 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
     plsDf, PlsClass, r2 = doPLS(df, classes, ntop=ntop)
 
     dfPlot = pd.DataFrame(
-        np.array((PlsClass.coef_[tClass,:], calculateVips(PlsClass))).T,
+        np.array((PlsClass.coef_[:,tClass], calculateVips(PlsClass))).T,
         index=df.index,
         columns=["coef", "VIP"],
     )
@@ -1570,7 +1570,7 @@ def query(
         logger.info('Calculate normalisation within subset.')
         meanDf, barDf = normalisation(meanDf, barDf, normalise)
 
-    conditions = np.array(conditions)
+    conditions = np.array(list(set(conditions).intersection(set(meanDf.columns))))
     groups = []
     cols = []
     assert conditions.ndim in [1, 2]
