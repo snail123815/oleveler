@@ -12,17 +12,22 @@ def safeCol(cols):
 
 
 def safeExperimentNameMQ(MQDataPath): # Not used, but have a test case.
-    '''
+    """
+    MaxQuant data has a column 'experiments' in the 'evidence.txt' file.
     Check if the 'experiments' column contains `-`, if so, change to `.`.
-    This change should ensure success run of DESeq2'''
-    files = os.listdir(MQDataPath)
+    This change should ensure success run of DESeq2
+    """
+    if isinstance(MQDataPath, str):
+        MQDataPath = Path(MQDataPath)
+    files = MQDataPath.glob("*.txt")
     assert all(f in files for f in ['evidence.txt', 'proteinGroups.txt'])
 
     # evidence.txt
-    evFile = os.path.join(MQDataPath, 'evidence.txt')
+    evFile: Path = MQDataPath / "evidence.txt"
     evDf = pd.read_csv(evFile, sep='\t', header=0, index_col=None)
-    assert all(c in evDf.columns for c in ['Raw file', 'Experiment']), \
-        f'Does not find "Raw file", "Experiment" column in {evFile}.\n{evDf.head()}'
+    assert all(
+        c in evDf.columns for c in ["Raw file", "Experiment"]
+    ), f"Does not find specified columns in {evFile}.\n{evDf.head()}"
     experiments = evDf['Experiment'].unique()
     illegal = re.compile('-+')
     hasIllegal = False
@@ -31,10 +36,14 @@ def safeExperimentNameMQ(MQDataPath): # Not used, but have a test case.
             hasIllegal = True
             break
     if hasIllegal:
-        logger.warning(f'Find illegal pattern "{illegal.pattern}" in Experiment setup, ' + \
-            'will replace it with "_"')
-        evDf['Experiment'] = evDf['Experiment'].map(lambda x: illegal.sub('_', x))
-        os.rename(evFile, evFile+'._bk')
+        logger.warning(
+            f'Find illegal pattern "{illegal.pattern}" in Experiment setup, '
+            'will replace it with "_"'
+        )
+        evDf["Experiment"] = evDf["Experiment"].map(
+            lambda x: illegal.sub("_", x)
+        )
+        evFile.rename(evFile.with_suffix(evFile.suffix + "._bk"))
         evDf.to_csv(evFile, sep='\t', index=False)
         pgFile = os.path.join(MQDataPath, 'proteinGroups.txt')
         pgDf = pd.read_csv(pgFile, sep='\t', header=0, index_col=0)
@@ -112,13 +121,34 @@ def safeAnnotations(annotationPath: Path, toRemove=[]):
 
 
 def safeMQdata(pgPath, evPath, toRemove=[]):
-    experiments = pd.read_csv(evPath, sep='\t', usecols=['Experiment'])['Experiment'].unique()
+    """
+    Processes the proteinGroups.txt and evidence.txt files to ensure safe experiment names and optionally removes specified experiments.
+    Args:
+        pgPath (str): Path to the proteinGroups.txt file.
+        evPath (str): Path to the evidence.txt file.
+        toRemove (list, optional): List of experiments to remove from the annotation file. Defaults to an empty list.
+    Returns:
+        tuple: Paths to the processed proteinGroups and evidence files.
+    The function performs the following steps:
+    1. Reads the unique experiment names from the evidence file.
+    2. Ensures that experiment names are safe (no spaces).
+    3. If any experiment names are not safe or if there are experiments to remove:
+        a. Creates temporary files for the processed proteinGroups and evidence files.
+        b. Processes the evidence file to replace unsafe experiment names and remove specified experiments.
+        c. Processes the proteinGroups file to replace unsafe experiment names and remove columns corresponding to specified experiments.
+    4. If there are no unsafe experiment names but there are experiments to remove:
+        a. Creates temporary files for the processed proteinGroups and evidence files.
+        b. Processes the evidence file to remove specified experiments.
+        c. Processes the proteinGroups file to remove columns corresponding to specified experiments.
+    5. Returns the paths to the processed proteinGroups and evidence files.
+    """
+    experiments = pd.read_csv(evPath, sep="\t", usecols=["Experiment"])[
+        "Experiment"
+    ].unique()
     safeExps = safeCol(experiments)
     if not all(e in experiments for e in safeExps) or len(toRemove) != 0:
-        global pgSafe
-        global evSafe
-        pgSafe = NamedTemporaryFile()
-        evSafe = NamedTemporaryFile()
+        pgSafe = NamedTemporaryFile(delete=False)
+        evSafe = NamedTemporaryFile(delete=False)
 
     if not all(e in experiments for e in safeExps):
         with open(evPath, 'r') as oev:
