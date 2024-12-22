@@ -2,6 +2,7 @@ import os
 import re
 from tempfile import NamedTemporaryFile
 import pandas as pd
+from pathlib import Path
 from .project_logger import logger
 
 
@@ -51,56 +52,61 @@ def safeExperimentNameMQ(MQDataPath): # Not used, but have a test case.
     return
 
 
-def safeAnnotations(annotationPath, toRemove=[]):
-    conditions = pd.read_csv(annotationPath, usecols=['Condition'])['Condition'].unique()
-    safeConds = safeCol(conditions)
-    if not all(c in conditions for c in safeConds):
-        global anSafe_1
-        anSafe_1 = NamedTemporaryFile()
-        with open(annotationPath, 'r') as oan:
-            with open(anSafe_1.name, 'w') as nan:
-                nan.write(oan.readline())
-                for l in oan:
-                    row = l.split(',')
-                    try:
-                        row[1] = safeConds[conditions.tolist().index(row[1])]
-                    except ValueError as e:
-                        raise e
-                    except IndexError as e:
-                        raise e
-                    nan.write(','.join(row))
-        annotationPath = anSafe_1.name
-    experiments = pd.read_csv(annotationPath, usecols=['Experiment'])['Experiment'].unique()
-    safeExps = safeCol(experiments)
-    if not all(e in experiments for e in safeExps):
-        global anSafe_2
-        anSafe_2 = NamedTemporaryFile()
-        with open(annotationPath, 'r') as oan:
-            with open(anSafe_2.name, 'w') as nan:
-                nan.write(oan.readline())
-                for l in oan:
-                    row = l.split(',')
-                    try:
-                        row[3] = safeExps[experiments.tolist().index(row[3].strip())]
-                    except ValueError as e:
-                        raise e
-                    except IndexError as e:
-                        raise e
-                    if not row[-1].endswith('\n'):
-                        row[-1] += "\n"
-                    nan.write(','.join(row))
-        annotationPath = anSafe_2.name
-        anSafe_1.close()
+def safeAnnotations(annotationPath: Path, toRemove=[]):
+    """
+    annotationPath: str, path to the annotation file
+    toRemove: list, list of experiments to remove from the annotation file
+
+    annotation file has to be a csv file, for the use in R DESeq2
+    The column names are: 'Raw.file', 'Condition', 'BioReplicate', 'Experiment'
+    'Raw.file' and 'Experiment' will be the same in the file if
+    `lcmsms_randomasiation.tsv` is used to change data table header.
+
+    Cannot change these columns because R package DESeq2 requires them.
+
+    ```R
+    annot <- read.csv("{annotationPath}", header=TRUE)
+    ```
+
+    TODO use lcmsms_randomasiation.tsv to generate annotation file.
+
+    """
+    annoDf = pd.read_csv(
+        annotationPath,
+        header=0,
+        sep=",",
+        usecols=["Raw.file", "Condition", "BioReplicate", "Experiment"],
+        index_col="Raw.file",
+    )
+    # Assert index column only contains unique values
+    duplicated_index = annoDf.index[annoDf.index.duplicated()].tolist()
+    if len(duplicated_index) > 0:
+        logger.error(
+            f"Index column contains duplicated values {duplicated_index}"
+        )
+        raise ValueError(
+            f"Index column contains duplicated values {duplicated_index}"
+        )
+    needs_change = False
     if len(toRemove) != 0:
-        annDf = pd.read_csv(annotationPath, index_col=0, header=0)
+        needs_change = True
         for r in toRemove:
-            assert r in annDf.Experiment.values, f"{r} not in {annDf.Experiment}"
-            annDf = annDf[annDf.Experiment != r]
-        global anSafe_3
-        anSafe_3 = NamedTemporaryFile()
-        annDf.to_csv(anSafe_3.name)
-        annotationPath = anSafe_3.name
-        anSafe_2.close()
+            assert (
+                r in annoDf["Experiment"].values
+            ), f"{r} not in {annoDf.Experiment}"
+            annoDf = annoDf[annoDf.Experiment != r]
+    safeConds = safeCol(annoDf["Condition"])
+    safeExpes = safeCol(annoDf["Experiment"])
+    if not all(c in annoDf["Condition"] for c in safeConds) or not all(
+        e in annoDf["Experiment"] for e in safeExpes
+    ):
+        needs_change = True
+    if needs_change:
+        annoDf["Condition"] = safeConds
+        annoDf["Experiment"] = safeExpes
+        with NamedTemporaryFile(delete=False) as anSafe:
+            annoDf.to_csv(anSafe.name)
+            annotationPath = anSafe.name
 
     return annotationPath
 

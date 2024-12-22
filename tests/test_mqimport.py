@@ -1,12 +1,10 @@
-from oleveler import safeExperimentNameMQ
-
+import os
+import re
 import unittest
 
-import os
-import shutil
 import pandas as pd
-import re
 
+from oleveler.safe_annotations import safeExperimentNameMQ
 
 
 class Test_safeExperimentName(unittest.TestCase):
