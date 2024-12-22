@@ -99,7 +99,8 @@ Open `Annotation.csv` with Excel, edit it to fit your proteomics project.
 
 There are four columns in this file: `Raw.file`, `Condition`, `BioReplicate`, `Experiment`
 
-`Raw.file` - fill in all the file name of the raw proteomics files, but without the file extension. Eg. for '210619_DC_01.raw' you can fill in '210619_DC_01'. Contents of this column needs to be unique.  
+`Raw.file` - For MaxQuant data or RNASeq featureCounts data, fill in all the file name of the raw proteomics files, but without the file extension. Eg. for '210619_DC_01.raw' you can fill in '210619_DC_01'. Contents of this column needs to be unique.  
+For other data input, fill in the same as `Experiment` column.  
 `Condition` - fill in the experimental condition for each raw file. Same condition (biological replicates should share the same name). Please add all experimental information to this column. Eg. strain 'WT' in 'MM' medium collected at 24 hours, you should enter something like 'WT_MM_24'.  
 `BioReplicate` - fill in a number of the bio-replicate within one condition. Eg. '210619_DC_01', '210619_DC_09', and '210619_DC_20' are samples from the same condition, then give them numbering '1', '2', and '3' in this column. Orders do not matter.  
 `Experiment` - fill in the experiment name of the raw file belongs. Each should contain both condition and bio-replicate information. **Contents of this column needs to be unique only if there is only one LC-MS/MS run per sample.**
