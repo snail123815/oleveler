@@ -197,6 +197,7 @@ def safeMQdata(pgPath, evPath, toRemove=[]):
                         npg.write(
                             '\t'.join(eles[i] for i in range(len(eles)) if i not in toRemoveCols)
                         )
+                        npg.write('\n')
 
         evPath = evSafe.name
         pgPath = pgSafe.name
