@@ -17,6 +17,7 @@ dependencies:
   - nodejs
   - ipympl
   - seaborn
+  - tqdm
   - pip:
     - bcbio-gff
     - jupyterthemes
