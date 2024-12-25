@@ -820,11 +820,18 @@ def plotPlsVplot(df, ntop=None, classes=None, cols=None, n_components=2,
         logger.info(classes)
     plsDf, PlsClass, r2 = doPLS(df, classes, ntop=ntop)
 
-    dfPlot = pd.DataFrame(
-        np.array((PlsClass.coef_[:,tClass], calculateVips(PlsClass))).T,
-        index=df.index,
-        columns=["coef", "VIP"],
-    )
+    try:
+        dfPlot = pd.DataFrame(
+            np.array((PlsClass.coef_[tClass,:], calculateVips(PlsClass))).T,
+            index=df.index,
+            columns=["coef", "VIP"],
+        )
+    except ValueError:
+        dfPlot = pd.DataFrame(
+            np.array((PlsClass.coef_[:,tClass], calculateVips(PlsClass))).T,
+            index=df.index,
+            columns=["coef", "VIP"],
+        )
 
     directory = f'Plots/PLS/'
     name = f'PLS_Vplot_{title}'
@@ -1002,7 +1009,8 @@ def plotVolcano(compDf, quantSeries, figsize=(6, 5),
     logpThresh = -np.log10(pThresh)
 
     # For output only
-    vDf = pd.concat([log2fc, procPval], axis=1, names=[colFc, f"'-log10({colPv})"])
+    vDf = pd.concat([log2fc, procPval], axis=1)
+    vDf.columns = [colFc, f"'-log10({colPv})"]
 
     if not isinstance(xmax, type(None)):
         xmax = xmax*1.1
