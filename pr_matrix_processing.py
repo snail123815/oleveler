@@ -1,3 +1,4 @@
+import logging
 import re
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from oleveler.main import calHash
 MLOG10ADJP_COL = "adj.pvalue"
 LOG2FC_COL = "log2FC"
 
+logger=logging.getLogger(__name__)
 
 class ProtPeps:
     def __init__(
@@ -134,9 +136,9 @@ class ProtPeps:
             try:
                 data_run_ids.append(self.sample_id_regex.search(c).group(1))
             except AttributeError as e:
-                print(data_run_ids)
-                print(c)
-                print(self.sample_id_regex)
+                logger.info(data_run_ids)
+                logger.info(c)
+                logger.info(self.sample_id_regex)
                 raise e
 
         randomisation_data = pd.read_csv(
@@ -225,8 +227,8 @@ class ProtPeps:
             pep_df = self.__sum_pr_to_pep(pr_df, data_columns)
             pep_df.to_csv(pep_matrix_output, sep="\t")
 
-        print(f"{self.name} peptide matrix shape: {pep_df.shape}")
-        print(f"{self.name} peptide matrix path: {pep_matrix_output}")
+        logger.info(f"{self.name} peptide matrix shape: {pep_df.shape}")
+        logger.info(f"{self.name} peptide matrix path: {pep_matrix_output}")
 
         return pr_df, pep_df, pep_matrix_output
 
@@ -236,7 +238,7 @@ class ProtPeps:
     ):
         (mapped,) = (pep_indexed_df.index.to_series().map(self.protPep_mapper),)
         if all(pd.isna(m) for m in mapped):
-            # print(f'Mapping not successful, return original table.')
+            # logger.info(f'Mapping not successful, return original table.')
             return None
         target_df = pd.concat(
             [
@@ -264,13 +266,13 @@ class ProtPeps:
             try:
                 pep_indexed_df = pd.read_excel(table_path, index_col=0)
             except ValueError as excel_read_err:
-                print(f"Excel file {table_path} read failed")
+                logger.error(f"Excel file {table_path} read failed")
                 raise excel_read_err
         target_df = self.__map_proteingroup_to_peptide_df(pep_indexed_df)
         if target_df is not None:
-            print(f"Mapped {table_path}")
+            logger.info(f"Mapped {table_path}")
         else:
-            print(f"Not mapped: {table_path}")
+            logger.info(f"Not mapped: {table_path}")
         return target_df
 
     def mapdir_proteingroup_to_peptide(
@@ -292,7 +294,7 @@ class ProtPeps:
             target_df = self.map_proteingroup_to_peptide(target_file)
             if target_df is not None:
                 mapped_dir.mkdir(exist_ok=True)
-                print(f"\toutput: {mapped_file}")
+                logger.info(f"\toutput: {mapped_file}")
                 target_df.to_csv(mapped_file, sep="\t")
 
     def get_all_peptides(self, protein_group: str) -> list[str]:
@@ -308,83 +310,7 @@ class ProtPeps:
             ].index.tolist()
         )
 
-
-def filter_volcano(
-    volcano_df,
-    log2fc_t=1,
-    minus_logp_t=-np.log10(0.05),
-    overlap_check_range=100,
-    target_protein="SCO4648",
-):
-
-    minus_logp_t = float(minus_logp_t)
-    for c in volcano_df.columns:
-        if c.startswith(MLOG10ADJP_COL):
-            MLOG10ADJP_COL = c
-        elif c.startswith(LOG2FC_COL):
-            LOG2FC_COL = c
-        else:
-            pass
-    filtered = volcano_df[
-        (volcano_df[MLOG10ADJP_COL] >= minus_logp_t)
-        & (
-            (volcano_df[LOG2FC_COL] >= log2fc_t)
-            | (volcano_df[LOG2FC_COL] <= -log2fc_t)
-        )
-    ].sort_values(LOG2FC_COL)
-    filtered_up = filtered[(filtered[LOG2FC_COL] >= log2fc_t)].iloc[
-        -overlap_check_range:, :
-    ]
-    filtered_down = filtered[(filtered[LOG2FC_COL] <= -log2fc_t)].iloc[
-        :overlap_check_range, :
-    ]
-    overlap_pgs = []
-    for pep, pg in filtered_up["Protein_group"].items():
-        if pg in filtered_down["Protein_group"]:
-            overlap_pgs.append((pep, pg))
-    if len(overlap_pgs) > 0:
-        print(
-            "Found protein group(s) contain both up and down regulated peptides"
-        )
-        print(overlap_pgs)
-    else:
-        print("No protein group overlap for up and down regulated peptides")
-
-    target_protein_in_filtered = filtered[
-        filtered["Protein_group"].str.contains(target_protein)
-    ]
-    target_protein_in_all = volcano_df[
-        volcano_df["Protein_group"].str.contains(target_protein)
-    ]
-    if target_protein_in_filtered.shape[0] > 0:
-        print(
-            "There are significant changes with the following thresholds:\n"
-            f"\tFC >= {np.power(2,log2fc_t):.2f} (log2fc {log2fc_t:.2f})\n"
-            f"\tp <= {np.power(10, -minus_logp_t):.2f}, (-log10(p) {minus_logp_t:.2f})"
-        )
-        print()
-        print(target_protein_in_filtered)
-        print("None significant changes:")
-        print()
-        print(
-            pd.concat(
-                [target_protein_in_all, target_protein_in_filtered],
-                axis=0,
-                # ignore_index=True,
-            ).drop_duplicates(keep=False)
-        )
-    else:
-        print(
-            "There are NO significant changes with the following thresholds:\n"
-            f"\tFC >= {np.power(2,log2fc_t):.2f} (log2fc {log2fc_t:.2f})\n"
-            f"\tp <= {np.power(10, -minus_logp_t):.2f}, (-log10(p) {minus_logp_t:.2f})\n"
-            "Print all:"
-        )
-        print()
-        print(target_protein_in_all)
-
-
-def filter_volcano(
+def filter_pep_volcano_get_proteins(
     volcano_df,
     log2fc_t=1,
     minus_logp_t=-np.log10(0.05),
@@ -430,12 +356,12 @@ def filter_volcano(
             ]
             overlap_pgs.append((pg, pepup, peps_down))
     if len(overlap_pgs) > 0:
-        print(
+        logger.info(
             "Found protein group(s) contain both up and down regulated peptides"
         )
-        print(overlap_pgs)
+        logger.info(overlap_pgs)
     else:
-        print(
+        logger.info(
             "No protein group overlap for up and down regulated peptides",
             (
                 (
@@ -457,16 +383,16 @@ def filter_volcano(
             volcano_df["Protein_group"].str.contains(target_protein)
         ]
         if target_protein_filtered.shape[0] > 0:
-            print(
+            logger.info(
                 "There are significant changes with the following thresholds:\n"
                 f"\tFC >= {np.power(2,log2fc_t):.2f} (log2fc {log2fc_t:.2f})\n"
                 f"\tp <= {np.power(10, -minus_logp_t):.2f}, (-log10(p) {minus_logp_t:.2f})"
             )
-            print()
-            print(target_protein_filtered)
-            print("None significant changes:")
-            print()
-            print(
+            logger.info()
+            logger.info(target_protein_filtered)
+            logger.info("None significant changes:")
+            logger.info()
+            logger.info(
                 pd.concat(
                     [target_protein_in_all, target_protein_filtered],
                     axis=0,
@@ -474,12 +400,12 @@ def filter_volcano(
                 ).drop_duplicates(keep=False)
             )
         else:
-            print(
+            logger.info(
                 "There are NO significant changes with the following thresholds:\n"
                 f"\tFC >= {np.power(2,log2fc_t):.2f} (log2fc {log2fc_t:.2f})\n"
                 f"\tp <= {np.power(10, -minus_logp_t):.2f}, (-log10(p) {minus_logp_t:.2f})\n"
                 "Print all:"
             )
-            print()
-            print(target_protein_in_all)
+            logger.info()
+            logger.info(target_protein_in_all)
         return filtered, overlap_pgs, target_protein_filtered
