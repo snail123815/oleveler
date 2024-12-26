@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pr_matrix_processing import ProtPeps, filter_volcano
+from pr_matrix_processing import ProtPeps, filter_pep_volcano_get_proteins
 
 
 class Real_Diff_Peps_Finder:
@@ -41,13 +41,13 @@ class Real_Diff_Peps_Finder:
         minus_logp_t=-np.log10(0.01),
         overlap_check_range=None,
     ):
-        filtered_exp, _, _ = filter_volcano(
+        filtered_exp, _, _ = filter_pep_volcano_get_proteins(
             self.exp_volcano_mapped_df,
             log2fc_t,
             minus_logp_t,
             overlap_check_range,
         )
-        filtered_ctr, _, _ = filter_volcano(
+        filtered_ctr, _, _ = filter_pep_volcano_get_proteins(
             self.ctr_volcano_mapped_df,
             log2fc_t,
             minus_logp_t,
