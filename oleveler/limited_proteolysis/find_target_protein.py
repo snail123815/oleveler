@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pr_matrix_processing import ProtPeps, filter_pep_volcano_get_proteins
+from oleveler.limited_proteolysis import ProtPeps, filter_pep_volcano_get_proteins
 
 
 class Real_Diff_Peps_Finder:
