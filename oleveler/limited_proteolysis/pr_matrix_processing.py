@@ -7,9 +7,6 @@ import pandas as pd
 from tqdm import tqdm
 from oleveler.main import calHash
 
-# columns in volcano plot data
-MLOG10ADJP_COL = "adj.pvalue"
-LOG2FC_COL = "log2FC"
 
 logger=logging.getLogger(__name__)
 
@@ -20,9 +17,52 @@ class ProtPeps:
         pr_matrix_path,
         experiment_mapper,
         sample_id_regex,
+        output_path=Path("./dataTables"),
     ) -> None:
+        """Map protein names to precursors matrix.
 
+        This class handles the loading and processing of precursors data matrix,
+        map proteins to precursors. pr_matrix comes from DIA-NN output.
+
+        Parameters
+        ----------
+        name_experiment : str
+            Name identifier for the experiment
+        pr_matrix_path : str or Path
+            Path to the precursors matrix data file from DIA-NN output
+        experiment_mapper : str or Path
+            Path to lcmsms_randomisation.tsv file, two columns with no header
+            First column corresponds to data file id (term to construct regex)
+            Second column corresponds to experiment name, unique
+        sample_id_regex : str or Pattern
+            Regular expression pattern to extract sample identifiers
+
+        Attributes
+        ----------
+        name : str
+            Experiment name
+        pr_matrix_path : Path
+            Validated path to precursors matrix file
+        experiment_mapper : Path
+            Path to lcmsms_randomisation.tsv file
+        sample_id_regex : Str or pattern
+            Regex pattern for sample IDs
+        ha : str
+            Hash value calculated from input parameters
+        pr_df : DataFrame
+            Processed protein data (initialized as None)
+        pep_df : DataFrame
+            Processed peptide data (initialized as None)
+        pep_matrix_output : Path
+            Output path for peptide matrix (initialized as None)
+
+        Notes
+        -----
+        The class expects input files in standard proteomics data formats and
+        uses regular expressions to parse sample identifiers from column names.
+        """
         self.name = name_experiment
+        self.output_path = output_path
         if isinstance(pr_matrix_path, str):
             self.pr_matrix_path = Path(pr_matrix_path)
         else:
@@ -51,15 +91,18 @@ class ProtPeps:
         """
         Generates a mapper from protein groups to stripped sequences.
 
-        This function concatenates the 'Protein.Group' and 'Stripped.Sequence' columns
-        of the provided DataFrame twice, drops duplicates, and sets the 'Stripped.Sequence'
-        as the index. It returns a Series mapping 'Stripped.Sequence' to 'Protein.Group'.
+        This function concatenates the 'Protein.Group' and 'Stripped.Sequence'
+        columns of the provided DataFrame twice, drops duplicates, and sets the
+        'Stripped.Sequence' as the index. It returns a Series mapping
+        'Stripped.Sequence' to 'Protein.Group'.
 
         Args:
-            pr_df (pd.DataFrame): DataFrame containing protein group and peptide information.
+            pr_df (pd.DataFrame): DataFrame containing protein group and peptide
+            information.
 
         Returns:
             pd.Series: A Series mapping 'Stripped.Sequence' to 'Protein.Group'.
+            (Note: 'Stripped.Sequence' is the index of the Series.)
         """
         protein_peptide_mapper = (
             pd.concat(
@@ -85,16 +128,6 @@ class ProtPeps:
             .drop_duplicates()
             .set_index("Stripped.Sequence")["Protein.Group"]
         )
-
-        # Remove some remaining razer sequence
-        # Stripped.Sequence
-        # CIGCHTCSVTCK           SCO0217;SCO6534
-        # CIGCHTCSVTCK                   SCO0217
-        # KLMSWVDEEA             SCO5514;SCO7154
-        # KLMSWVDEEA                     SCO5514
-        # KVAVIGYGSQGHAHALSLR            SCO5514
-        # KVAVIGYGSQGHAHALSLR    SCO5514;SCO7154
-
         duplicated_sequences = {}
         for seq, pg in protein_peptide_mapper[
             protein_peptide_mapper.index.duplicated(keep=False)
@@ -142,8 +175,8 @@ class ProtPeps:
                 raise e
 
         randomisation_data = pd.read_csv(
-            self.experiment_mapper, sep="\t", index_col=1, header=None
-        )[0]
+            self.experiment_mapper, sep="\t", index_col=0, header=None
+        )[1]
         try:
             named_data_columns = [
                 randomisation_data[id].replace(".", "_") for id in data_run_ids
@@ -211,11 +244,8 @@ class ProtPeps:
             self.pr_matrix_path
         ), f"String '.pr_matrix' not found in {self.pr_matrix_path}"
 
-        pep_matrix_output = Path(
-            "./dataTables/"
-            + self.pr_matrix_path.name.replace(
-                ".pr_matrix", f"_{self.ha}.pep_matrix"
-            )
+        pep_matrix_output = self.output_path / self.pr_matrix_path.name.replace(
+            ".pr_matrix", f"_{self.ha}.pep_matrix"
         )
         pr_df, data_columns = self.__read_pr_matrix()
 
@@ -320,8 +350,6 @@ def filter_pep_volcano_get_proteins(
     """
     return filtered, overlap_pgs, target_protein_filtered
     """
-    global MLOG10ADJP_COL
-    global LOG2FC_COL
     minus_logp_t = float(minus_logp_t)
     for c in volcano_df.columns:
         if c.startswith(MLOG10ADJP_COL):
