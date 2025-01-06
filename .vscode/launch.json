@@ -5,7 +5,7 @@
             "name": "Python: Unittest",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/tests/test_safe_annotations.py",
+            "program": "${workspaceFolder}/tests/test_pr_matrix_processing.py",
             "console": "integratedTerminal",
             "env":{
                 "PYTHONPATH": "${workspaceFolder}",
