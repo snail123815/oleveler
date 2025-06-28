@@ -11,7 +11,7 @@ def safeCol(cols):
     return [illegal.sub("_", col) for col in cols]
 
 
-def safeExperimentNameMQ(MQDataPath): # Not used, but have a test case.
+def safeExperimentNameMQ(MQDataPath):  # Not used, but have a test case.
     """
     MaxQuant data has a column 'experiments' in the 'evidence.txt' file.
     Check if the 'experiments' column contains `-`, if so, change to `.`.
@@ -19,17 +19,18 @@ def safeExperimentNameMQ(MQDataPath): # Not used, but have a test case.
     """
     if isinstance(MQDataPath, str):
         MQDataPath = Path(MQDataPath)
-    files = MQDataPath.glob("*.txt")
-    assert all(f in files for f in ['evidence.txt', 'proteinGroups.txt'])
+    files = list(MQDataPath.glob("*.txt"))
+    required_files = [MQDataPath / "evidence.txt", MQDataPath / "proteinGroups.txt"]
+    assert all(f in files for f in required_files)
 
     # evidence.txt
     evFile: Path = MQDataPath / "evidence.txt"
-    evDf = pd.read_csv(evFile, sep='\t', header=0, index_col=None)
+    evDf = pd.read_csv(evFile, sep="\t", header=0, index_col=None)
     assert all(
         c in evDf.columns for c in ["Raw file", "Experiment"]
     ), f"Does not find specified columns in {evFile}.\n{evDf.head()}"
-    experiments = evDf['Experiment'].unique()
-    illegal = re.compile('-+')
+    experiments = evDf["Experiment"].unique()
+    illegal = re.compile("-+")
     hasIllegal = False
     for exp in experiments:
         if illegal.search(exp):
@@ -44,20 +45,20 @@ def safeExperimentNameMQ(MQDataPath): # Not used, but have a test case.
             lambda x: illegal.sub("_", x)
         )
         evFile.rename(evFile.with_suffix(evFile.suffix + "._bk"))
-        evDf.to_csv(evFile, sep='\t', index=False)
-        pgFile = os.path.join(MQDataPath, 'proteinGroups.txt')
-        pgDf = pd.read_csv(pgFile, sep='\t', header=0, index_col=0)
+        evDf.to_csv(evFile, sep="\t", index=False)
+        pgFile = os.path.join(MQDataPath, "proteinGroups.txt")
+        pgDf = pd.read_csv(pgFile, sep="\t", header=0, index_col=0)
         newColumns = []
         for col in pgDf.columns:
             for exp in experiments:
                 if exp in col:
-                    cExp = illegal.sub('_', exp)
+                    cExp = illegal.sub("_", exp)
                     col = col.replace(exp, cExp)
                     break
             newColumns.append(col)
         pgDf.columns = newColumns
-        os.rename(pgFile, pgFile+'._bk')
-        pgDf.to_csv(pgFile, sep='\t')
+        os.rename(pgFile, pgFile + "._bk")
+        pgDf.to_csv(pgFile, sep="\t")
     return
 
 
@@ -151,31 +152,33 @@ def safeMQdata(pgPath, evPath, toRemove=[]):
         evSafe = NamedTemporaryFile(delete=False)
 
     if not all(e in experiments for e in safeExps):
-        with open(evPath, 'r') as oev:
-            with open(evSafe.name, 'w') as nev:
+        with open(evPath, "r") as oev:
+            with open(evSafe.name, "w") as nev:
                 headers = oev.readline()
-                expIdx = headers.split('\t').index('Experiment')
+                expIdx = headers.split("\t").index("Experiment")
                 nev.write(headers)
                 for l in oev:
-                    row = l.split('\t')
+                    row = l.split("\t")
                     if row[expIdx] in toRemove:
                         continue
                     try:
-                        row[expIdx] = safeExps[experiments.tolist().index(row[expIdx])]
+                        row[expIdx] = safeExps[
+                            experiments.tolist().index(row[expIdx])
+                        ]
                         if row[expIdx] in toRemove:
                             continue
                     except ValueError as e:
                         raise e
-                    nev.write('\t'.join(row))
+                    nev.write("\t".join(row))
 
-        with open(pgPath, 'r') as opg:
-            with open(pgSafe.name, 'w') as npg:
-                headers = opg.readline().split('\t')
+        with open(pgPath, "r") as opg:
+            with open(pgSafe.name, "w") as npg:
+                headers = opg.readline().split("\t")
                 nheaders = []
                 toRemoveCols = []
                 for i, h in enumerate(headers):
                     needRemoval = False
-                    ts = h.split(' ') # The experiment cannot contain space
+                    ts = h.split(" ")  # The experiment cannot contain space
                     if ts[-1] in toRemove:
                         toRemoveCols.append(i)
                         needRemoval = True
@@ -187,52 +190,60 @@ def safeMQdata(pgPath, evPath, toRemove=[]):
                     except ValueError:
                         pass
                     if not needRemoval:
-                        nheaders.append(' '.join(ts))
-                npg.write('\t'.join(nheaders))
+                        nheaders.append(" ".join(ts))
+                npg.write("\t".join(nheaders))
                 if len(toRemoveCols) == 0:
                     npg.writelines(opg.readlines())
                 else:
                     for l in opg:
-                        eles = l.split('\t')
+                        eles = l.split("\t")
                         npg.write(
-                            '\t'.join(eles[i] for i in range(len(eles)) if i not in toRemoveCols)
+                            "\t".join(
+                                eles[i]
+                                for i in range(len(eles))
+                                if i not in toRemoveCols
+                            )
                         )
-                        npg.write('\n')
+                        npg.write("\n")
 
         evPath = evSafe.name
         pgPath = pgSafe.name
 
     elif len(toRemove) != 0:
-        with open(evPath, 'r') as oev:
-            with open(evSafe.name, 'w') as nev:
+        with open(evPath, "r") as oev:
+            with open(evSafe.name, "w") as nev:
                 headers = oev.readline()
-                expIdx = headers.split('\t').index('Experiment')
+                expIdx = headers.split("\t").index("Experiment")
                 nev.write(headers)
                 for l in oev:
-                    row = l.split('\t')
+                    row = l.split("\t")
                     if row[expIdx] in toRemove:
                         continue
                     nev.write(l)
 
-        with open(pgPath, 'r') as opg:
-            with open(pgSafe.name, 'w') as npg:
-                headers = opg.readline().split('\t')
+        with open(pgPath, "r") as opg:
+            with open(pgSafe.name, "w") as npg:
+                headers = opg.readline().split("\t")
                 nheaders = []
                 toRemoveCols = []
                 for i, h in enumerate(headers):
-                    ts = h.split(' ') # Experiment name cannot contain space
+                    ts = h.split(" ")  # Experiment name cannot contain space
                     if ts[-1] in toRemove:
                         toRemoveCols.append(i)
                         continue
-                    nheaders.append(' '.join(ts))
-                npg.write('\t'.join(nheaders))
+                    nheaders.append(" ".join(ts))
+                npg.write("\t".join(nheaders))
                 if len(toRemoveCols) == 0:
                     npg.writelines(opg.readlines())
                 else:
                     for l in opg:
-                        eles = l.strip().split('\t')
+                        eles = l.strip().split("\t")
                         npg.write(
-                            '\t'.join(eles[i] for i in range(len(eles)) if i not in toRemoveCols)
+                            "\t".join(
+                                eles[i]
+                                for i in range(len(eles))
+                                if i not in toRemoveCols
+                            )
                         )
 
         evPath = evSafe.name
