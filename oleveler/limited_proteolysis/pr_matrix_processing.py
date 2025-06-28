@@ -8,7 +8,8 @@ from tqdm import tqdm
 from oleveler.main import calHash
 
 
-logger=logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+
 
 class ProtPeps:
     def __init__(
@@ -219,7 +220,7 @@ class ProtPeps:
                 current_pep = row["Stripped.Sequence"]
                 current_data = data
             else:
-                current_data += data
+                current_data = np.nansum([current_data, data], axis=0)
         # save the last peptide
         pep_data[current_pep] = current_data
         pep_data.pop("")  # remove the first empty pep
@@ -339,6 +340,7 @@ class ProtPeps:
                 self.protPep_mapper == protein_group
             ].index.tolist()
         )
+
 
 def filter_pep_volcano_get_proteins(
     volcano_df,
