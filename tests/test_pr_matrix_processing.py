@@ -36,7 +36,9 @@ class TestProtPeps(unittest.TestCase):
     def test_init(self):
         assert self.prot_peps.name == "test_experiment"
         assert self.prot_peps.pr_matrix_path == self.pr_matrix_path
-        assert self.prot_peps.experiment_mapper == self.lcmsms_randomasiation_path
+        assert (
+            self.prot_peps.experiment_mapper == self.lcmsms_randomasiation_path
+        )
         assert self.prot_peps.sample_id_regex.pattern == r"-(DU-[\d]{3})_"
         assert self.prot_peps.ha == "9e069f", self.prot_peps.ha
         pep_path = self.output_path / "report_9e069f.pep_matrix_r.tsv"
@@ -52,7 +54,7 @@ class TestProtPeps(unittest.TestCase):
         )
 
     def test_generate_mapper(self):
-        result_mapper = self.prot_peps.__generate_mapper(self.pr_df)
+        result_mapper = self.prot_peps._ProtPeps__generate_mapper(self.pr_df)
         index_values = result_mapper.index.values
         assert len(index_values) == len(set(index_values))
 
@@ -73,7 +75,6 @@ class TestProtPeps(unittest.TestCase):
         expected_mapper = pd.Series(
             data=["P1", "P2", "P3", "P2"],
             index=["SEQ1", "SEQ2", "SEQ3", "SEQ4"],
-            name="Protein.Group",
         )
         result_mapper = self.prot_peps._ProtPeps__generate_mapper(
             pr_df_with_duplicates
