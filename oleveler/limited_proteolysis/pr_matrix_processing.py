@@ -220,10 +220,14 @@ class ProtPeps:
                 current_pep = row["Stripped.Sequence"]
                 current_data = data
             else:
+                # This will result NaN become zeros, remember that!
                 current_data = np.nansum([current_data, data], axis=0)
         # save the last peptide
         pep_data[current_pep] = current_data
         pep_data.pop("")  # remove the first empty pep
+        # Convert zeros to NaN in all peptide data
+        for _, data in pep_data.items():
+            data[data == 0] = np.nan
         # convert to dataframe
         return pd.DataFrame.from_dict(
             pep_data, orient="index", columns=data_columns
